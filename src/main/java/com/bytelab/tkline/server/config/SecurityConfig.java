@@ -114,10 +114,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/validate-reset-token").permitAll()
                         .requestMatchers("/api/user/reset-password-by-token").permitAll()
 
-                        // 获取公钥（登录前需要，公开）
+                        // 获取公钥(登录前需要,公开)
                         .requestMatchers("/api/security/keys/public-key").permitAll()
 
-                        // Swagger文档（开发环境，生产环境建议禁用）
+                        // 节点和订阅管理 API (开发阶段临时开放)
+                        .requestMatchers("/api/v1/node/**").permitAll()
+                        .requestMatchers("/api/v1/subscription/**").permitAll()
+                        .requestMatchers("/api/v1/relation/**").permitAll()
+
+                        // Swagger文档(开发环境,生产环境建议禁用)
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
 
                         // 其他所有请求都需要认证

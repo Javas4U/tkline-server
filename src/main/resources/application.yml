@@ -24,7 +24,7 @@ spring:
     # 支持通过环境变量配置数据库连接
     url: jdbc:mysql://${DB_HOST:1.94.145.5}:${DB_PORT:3306}/${DB_NAME:tkline}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    password: ${DB_PASSWORD:hunter123@bytelab.com}
 
   # 热部署配置
   devtools:

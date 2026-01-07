@@ -10,7 +10,7 @@ import lombok.Data;
  * @author apex-tunnel
  */
 @Data
-public abstract class PageQueryDTO {
+public class PageQueryDTO {
 
     @Schema(description = "页码", example = "1", defaultValue = "1")
     private Integer pageNum = 1;
@@ -41,14 +41,14 @@ public abstract class PageQueryDTO {
     public int getOffset() {
         return (pageNum - 1) * pageSize;
     }
-    
+
     /**
      * 获取页码（兼容page字段）
      */
     public Integer getPage() {
         return pageNum;
     }
-    
+
     /**
      * 设置页码（兼容page字段）
      */
@@ -56,4 +56,3 @@ public abstract class PageQueryDTO {
         this.pageNum = page;
     }
 }
-
