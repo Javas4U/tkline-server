@@ -11,29 +11,14 @@ public class Subscription {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    @TableField("name")
-    private String name;
-
-    @TableField("type")
-    private String type;
-
-    @TableField("valid_from")
-    private LocalDateTime validFrom;
-
-    @TableField("valid_to")
-    private LocalDateTime validTo;
-
-    @TableField("traffic_limit")
-    private Long trafficLimit;
-
-    @TableField("traffic_used")
-    private Long trafficUsed;
-
-    @TableField("status")
-    private Integer status;
+    @TableField("group_name")
+    private String groupName;
 
     @TableField("description")
     private String description;
+
+    @TableField("order_no")
+    private String orderNo;
 
     @TableField("create_time")
     private LocalDateTime createTime;

@@ -17,6 +17,24 @@ public class NodeSubscriptionRelation {
     @TableField("subscription_id")
     private Long subscriptionId;
 
+    @TableField("order_no")
+    private String orderNo;
+
+    @TableField("valid_from")
+    private LocalDateTime validFrom;
+
+    @TableField("valid_to")
+    private LocalDateTime validTo;
+
+    @TableField("traffic_limit")
+    private Long trafficLimit;
+
+    @TableField("traffic_used")
+    private Long trafficUsed;
+
+    @TableField("status")
+    private Integer status;
+
     @TableField("create_time")
     private LocalDateTime createTime;
 

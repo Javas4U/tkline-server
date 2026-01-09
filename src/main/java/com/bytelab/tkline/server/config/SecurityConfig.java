@@ -1,5 +1,6 @@
 package com.bytelab.tkline.server.config;
 
+import com.bytelab.tkline.server.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -56,7 +57,7 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final com.bytelab.tkline.server.filter.JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     /**
      * 配置 Spring Security 过滤器链
@@ -117,10 +118,11 @@ public class SecurityConfig {
                         // 获取公钥(登录前需要,公开)
                         .requestMatchers("/api/security/keys/public-key").permitAll()
 
-                        // 节点和订阅管理 API (开发阶段临时开放)
-                        .requestMatchers("/api/v1/node/**").permitAll()
-                        .requestMatchers("/api/v1/subscription/**").permitAll()
-                        .requestMatchers("/api/v1/relation/**").permitAll()
+                        // 订阅配置接口(公开,供Clash/Karing等客户端获取配置)
+                        .requestMatchers("/api/subscription/config").permitAll()
+
+                        // 节点心跳接口(公开,供节点上报状态)
+                        .requestMatchers("/api/v1/node/heartbeat").permitAll()
 
                         // Swagger文档(开发环境,生产环境建议禁用)
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()

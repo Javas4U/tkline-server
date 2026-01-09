@@ -1,5 +1,6 @@
 package com.bytelab.tkline.server.dto.node;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -32,4 +33,19 @@ public class NodeDTO {
     @Schema(description = "是否在线")
     private Boolean online;
     private Integer subscriptionCount;
+
+    // 绑定配置信息(仅在查询订阅节点时返回)
+    @Schema(description = "绑定有效期开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime validFrom;
+
+    @Schema(description = "绑定有效期结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime validTo;
+
+    @Schema(description = "绑定流量限制(GB)")
+    private Long trafficLimit;
+
+    @Schema(description = "绑定状态:0=禁用,1=有效,2=过期")
+    private Integer bindingStatus;
 }

@@ -3,10 +3,13 @@
 <mapper namespace="com.bytelab.tkline.server.mapper.NodeSubscriptionRelationMapper">
 
     <insert id="insertBatch">
-        INSERT INTO node_subscription_relation (node_id, subscription_id, create_time, create_by, deleted)
+        INSERT INTO node_subscription_relation (
+            node_id, subscription_id, valid_from, valid_to, traffic_limit, traffic_used, status, create_time, create_by, deleted
+        )
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.nodeId}, #{item.subscriptionId}, #{item.createTime}, #{item.createBy}, #{item.deleted})
+            (#{item.nodeId}, #{item.subscriptionId}, #{item.validFrom}, #{item.validTo}, #{item.trafficLimit},
+             #{item.trafficUsed}, #{item.status}, #{item.createTime}, #{item.createBy}, #{item.deleted})
         </foreach>
     </insert>
 

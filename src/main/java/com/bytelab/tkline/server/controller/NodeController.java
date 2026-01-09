@@ -1,9 +1,13 @@
 package com.bytelab.tkline.server.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bytelab.tkline.server.common.ApiResult;
+import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeCreateDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.node.NodeHeartbeatDTO;
+import com.bytelab.tkline.server.dto.node.NodeQueryDTO;
+import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.service.NodeService;
 import io.swagger.v3.oas.annotations.Operation;
 
@@ -43,8 +47,8 @@ public class NodeController {
      * 分页查询节点
      */
     @PostMapping("/pageNodes")
-    public ApiResult<com.baomidou.mybatisplus.core.metadata.IPage<NodeDTO>> pageNodes(
-            @RequestBody com.bytelab.tkline.server.dto.node.NodeQueryDTO query) {
+    public ApiResult<IPage<NodeDTO>> pageNodes(
+            @RequestBody NodeQueryDTO query) {
         return ApiResult.success(nodeService.pageNodes(query));
     }
 
@@ -59,8 +63,8 @@ public class NodeController {
      * 分页查询节点绑定的订阅
      */
     @PostMapping("/pageNodeSubscriptions")
-    public ApiResult<com.baomidou.mybatisplus.core.metadata.IPage<com.bytelab.tkline.server.dto.subscription.SubscriptionDTO>> pageNodeSubscriptions(
-            @RequestParam Long nodeId, @RequestBody com.bytelab.tkline.server.dto.PageQueryDTO query) {
+    public ApiResult<IPage<SubscriptionDTO>> pageNodeSubscriptions(
+            @RequestParam Long nodeId, @RequestBody PageQueryDTO query) {
         return ApiResult.success(nodeService.pageNodeSubscriptions(nodeId, query));
     }
 }

@@ -7,7 +7,6 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class SubscriptionQueryDTO extends PageQueryDTO {
-    private String name;
-    private String type;
-    private Integer status;
+    private String groupName;
+    private String orderNo;
 }

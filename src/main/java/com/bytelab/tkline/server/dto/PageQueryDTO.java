@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * 分页查询基类
  * 包含通用的分页参数和验证逻辑
- * 
+ *
  * @author apex-tunnel
  */
 @Data
@@ -17,6 +17,12 @@ public class PageQueryDTO {
 
     @Schema(description = "每页数量", example = "20", defaultValue = "20")
     private Integer pageSize = 20;
+
+    @Schema(description = "名称(模糊查询)", example = "节点1")
+    private String name;
+
+    @Schema(description = "区域(模糊查询)", example = "香港")
+    private String region;
 
     /**
      * 验证并修正分页参数

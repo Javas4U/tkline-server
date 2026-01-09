@@ -2,11 +2,16 @@ package com.bytelab.tkline.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bytelab.tkline.server.converter.NodeConverter;
 import com.bytelab.tkline.server.converter.SubscriptionConverter;
+import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeCreateDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.node.NodeHeartbeatDTO;
+import com.bytelab.tkline.server.dto.node.NodeQueryDTO;
+import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.entity.Node;
 import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.exception.BusinessException;
@@ -64,9 +69,9 @@ public class NodeServiceImpl implements NodeService {
     }
 
     @Override
-    public com.baomidou.mybatisplus.core.metadata.IPage<NodeDTO> pageNodes(
-            com.bytelab.tkline.server.dto.node.NodeQueryDTO query) {
-        com.baomidou.mybatisplus.extension.plugins.pagination.Page<Node> page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
+    public IPage<NodeDTO> pageNodes(
+            NodeQueryDTO query) {
+        Page<Node> page = new Page<>(
                 query.getPage(), query.getPageSize());
 
         LambdaQueryWrapper<Node> wrapper = new LambdaQueryWrapper<>();
@@ -77,13 +82,13 @@ public class NodeServiceImpl implements NodeService {
             wrapper.eq(Node::getIpAddress, query.getIpAddress());
         }
         if (query.getRegion() != null && !query.getRegion().isEmpty()) {
-            wrapper.eq(Node::getRegion, query.getRegion());
+            wrapper.like(Node::getRegion, query.getRegion());
         }
         // ignore status for now if type mismatch or handle if needed
 
         wrapper.orderByDesc(Node::getId);
 
-        com.baomidou.mybatisplus.core.metadata.IPage<Node> result = nodeMapper.selectPage(page, wrapper);
+        IPage<Node> result = nodeMapper.selectPage(page, wrapper);
         return result.convert(nodeConverter::toDTO);
     }
 
@@ -98,14 +103,14 @@ public class NodeServiceImpl implements NodeService {
     }
 
     @Override
-    public com.baomidou.mybatisplus.core.metadata.IPage<com.bytelab.tkline.server.dto.subscription.SubscriptionDTO> pageNodeSubscriptions(
-            Long nodeId, com.bytelab.tkline.server.dto.PageQueryDTO query) {
+    public IPage<SubscriptionDTO> pageNodeSubscriptions(
+            Long nodeId, PageQueryDTO query) {
         // 创建分页对象
-        com.baomidou.mybatisplus.extension.plugins.pagination.Page<Subscription> page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
+        Page<Subscription> page = new Page<>(
                 query.getPage(), query.getPageSize());
 
         // 执行查询
-        com.baomidou.mybatisplus.core.metadata.IPage<Subscription> result = nodeMapper.selectSubscriptionsByNodeId(page,
+        IPage<Subscription> result = nodeMapper.selectSubscriptionsByNodeId(page,
                 nodeId);
 
         // 转换结果
