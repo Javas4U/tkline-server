@@ -1,0 +1,125 @@
+{
+    "log": {
+        "level": "info",
+        "timestamp": true
+    },
+    "experimental": {
+        "cache_file": {
+            "enabled": true,
+            "path": "cache.db",
+            "store_fakeip": true
+        },
+        "clash_api": {
+            "external_controller": "0.0.0.0:9090",
+            "secret": "5fcd85da-f3c5-4444-b497-ea759cef4248"
+        }
+    },
+    "inbounds": [
+        {
+            "type": "hysteria2",
+            "tag": "hy2-in",
+            "listen": "::",
+            "listen_port": 443,
+            "ignore_client_bandwidth": true,
+            "obfs": {
+                "type": "salamander",
+                "password": "NTdhMjdhMjAwMjRkYWEzYg=="
+            },
+            "tls": {
+                "enabled": true,
+                "alpn": [
+                    "h3"
+                ],
+                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
+                "key_path": "/etc/sing-box/cert/privkey.pem"
+            },
+            "users": [
+                {
+                    "name": "hunter",
+                    "password": "SUB20251208506820093413"
+                }
+            ]
+        },
+        {
+            "type": "tuic",
+            "tag": "tuic-in",
+            "listen": "::",
+            "listen_port": 8443,
+            "users": [
+                {
+                    "uuid": "52a7d83e-9a51-41d4-a58e-4d987cb4a018",
+                    "password": "c7921ebd04d93a67a18fd82c98e2c774",
+                    "name": "user_12345"
+                }
+            ],
+            "tls": {
+                "enabled": true,
+                "alpn": [
+                    "h3"
+                ],
+                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
+                "key_path": "/etc/sing-box/cert/privkey.pem"
+            }
+        },
+        {
+            "type": "vless",
+            "tag": "vless-in",
+            "listen": "::",
+            "listen_port": 443,
+            "users": [
+                {
+                    "uuid": "9f92a3e3-90ad-4fc4-82bf-9e7b6abceeef",
+                    "flow": "xtls-rprx-vision",
+                    "name": "user_12345"
+                }
+            ],
+            "tls": {
+                "enabled": true,
+                "server_name": "www.cloudflare.com",
+                "reality": {
+                    "enabled": true,
+                    "handshake": {
+                        "server": "www.cloudflare.com",
+                        "server_port": 443
+                    },
+                    "private_key": "sCWnFiLHYIWEt0Jsy_n75kUGIj4F5gYeeDI50UaZ0GY",
+                    "short_id": [
+                        "a1b2c3d4"
+                    ]
+                }
+            }
+        }
+    ],
+    "route": {
+        "rule_set": [
+            {
+                "tag": "geosite-category-ads-all",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+                "download_detour": "direct"
+            }
+        ],
+        "rules": [
+            {
+                "protocol": "dns",
+                "action": "hijack-dns"
+            },
+            {
+                "ip_is_private": true,
+                "action": "reject"
+            },
+            {
+                "rule_set": "geosite-category-ads-all",
+                "action": "reject"
+            }
+        ],
+        "auto_detect_interface": true
+    },
+    "outbounds": [
+        {
+            "type": "direct",
+            "tag": "direct"
+        }
+    ]
+}

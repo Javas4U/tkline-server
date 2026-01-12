@@ -8,6 +8,7 @@ import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 /**
@@ -105,7 +106,7 @@ public interface SubscriptionService {
      * @param baseUrl 服务器基础URL
      * @return Clash YAML配置内容
      */
-    String generateYamlConfig(String orderNo, List<Long> nodeIds, String baseUrl);
+    String generateYamlConfig(String orderNo, List<Long> nodeIds, String baseUrl) throws UnsupportedEncodingException;
 
     /**
      * 生成JSON格式配置(Karing/Sing-Box)
@@ -115,5 +116,15 @@ public interface SubscriptionService {
      * @param baseUrl 服务器基础URL
      * @return Karing/Sing-Box JSON配置内容
      */
-    String generateJsonConfig(String orderNo, List<Long> nodeIds, String baseUrl);
+    String generateJsonConfig(String orderNo, List<Long> nodeIdList, String baseUrl) throws UnsupportedEncodingException;
+
+    /**
+     * 生成Base64格式配置(V2Ray/Shadowsocks/通用)
+     *
+     * @param orderNo    订单号/订阅编号
+     * @param nodeIdList 可选节点ID列表,为null时返回所有节点
+     * @param baseUrl    服务器基础URL
+     * @return Base64编码的配置内容
+     */
+    String generateBase64Config(String orderNo, List<Long> nodeIdList, String baseUrl);
 }

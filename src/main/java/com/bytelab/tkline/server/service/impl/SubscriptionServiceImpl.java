@@ -1,5 +1,6 @@
 package com.bytelab.tkline.server.service.impl;
 
+import ch.qos.logback.core.util.StringUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -21,12 +22,13 @@ import com.bytelab.tkline.server.mapper.SubscriptionMapper;
 import com.bytelab.tkline.server.service.NodeSubscriptionRelationService;
 import com.bytelab.tkline.server.service.SubscriptionService;
 import com.bytelab.tkline.server.util.SubscriptionOrderGenerator;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,7 +45,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final NodeSubscriptionRelationService nodeSubscriptionRelationService;
     private final NodeSubscriptionRelationMapper nodeSubscriptionRelationMapper;
     private final NodeMapper nodeMapper;
-    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -106,19 +107,17 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
             // 计算总节点数
             Long totalNodeCount = nodeSubscriptionRelationMapper.selectCount(
-                new LambdaQueryWrapper<NodeSubscriptionRelation>()
-                    .eq(NodeSubscriptionRelation::getSubscriptionId, subscription.getId())
-                    .eq(NodeSubscriptionRelation::getDeleted, 0)
-            );
+                    new LambdaQueryWrapper<NodeSubscriptionRelation>()
+                            .eq(NodeSubscriptionRelation::getSubscriptionId, subscription.getId())
+                            .eq(NodeSubscriptionRelation::getDeleted, 0));
             dto.setNodeCount(totalNodeCount.intValue());
 
             // 计算可用节点数(状态为1=有效)
             Long availableNodeCount = nodeSubscriptionRelationMapper.selectCount(
-                new LambdaQueryWrapper<NodeSubscriptionRelation>()
-                    .eq(NodeSubscriptionRelation::getSubscriptionId, subscription.getId())
-                    .eq(NodeSubscriptionRelation::getStatus, 1)
-                    .eq(NodeSubscriptionRelation::getDeleted, 0)
-            );
+                    new LambdaQueryWrapper<NodeSubscriptionRelation>()
+                            .eq(NodeSubscriptionRelation::getSubscriptionId, subscription.getId())
+                            .eq(NodeSubscriptionRelation::getStatus, 1)
+                            .eq(NodeSubscriptionRelation::getDeleted, 0));
             dto.setAvailableNodeCount(availableNodeCount.intValue());
 
             return dto;
@@ -131,8 +130,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public IPage<NodeDTO> pageSubscriptionNodes(
             Long subscriptionId, PageQueryDTO query) {
         // 创建分页对象
-        Page<NodeDTO> page =
-                new Page<>(query.getPage(), query.getPageSize());
+        Page<NodeDTO> page = new Page<>(query.getPage(), query.getPageSize());
 
         // 执行查询 - 直接返回包含绑定配置的 NodeDTO,支持名称和区域查询
         return subscriptionMapper.selectNodesBySubscriptionId(page, subscriptionId, query.getName(), query.getRegion());
@@ -255,14 +253,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     // ========== 订阅配置生成方法 ==========
 
     @Override
-    public String generateYamlConfig(String orderNo, List<Long> nodeIds, String baseUrl) {
+    public String generateYamlConfig(String orderNo, List<Long> nodeIds, String baseUrl) throws UnsupportedEncodingException {
         log.info("生成YAML配置: orderNo={}, nodeIds={}", orderNo, nodeIds);
 
         // 1. 查询订阅信息
         Subscription subscription = subscriptionMapper.selectOne(
                 new LambdaQueryWrapper<Subscription>()
-                        .eq(Subscription::getOrderNo, orderNo)
-        );
+                        .eq(Subscription::getOrderNo, orderNo));
 
         if (subscription == null) {
             throw new BusinessException("订阅不存在: " + orderNo);
@@ -280,21 +277,20 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
-    public String generateJsonConfig(String orderNo, List<Long> nodeIds, String baseUrl) {
-        log.info("生成JSON配置: orderNo={}, nodeIds={}", orderNo, nodeIds);
+    public String generateJsonConfig(String orderNo, List<Long> nodeIdList, String baseUrl) throws UnsupportedEncodingException {
+        log.info("生成JSON配置: orderNo={}, nodeIds={}", orderNo, nodeIdList);
 
         // 1. 查询订阅信息
         Subscription subscription = subscriptionMapper.selectOne(
                 new LambdaQueryWrapper<Subscription>()
-                        .eq(Subscription::getOrderNo, orderNo)
-        );
+                        .eq(Subscription::getOrderNo, orderNo));
 
         if (subscription == null) {
             throw new BusinessException("订阅不存在: " + orderNo);
         }
 
         // 2. 查询订阅关联的节点
-        List<Node> nodes = getSubscriptionNodesForConfig(subscription.getId(), nodeIds);
+        List<Node> nodes = getSubscriptionNodesForConfig(subscription.getId(), nodeIdList);
 
         if (nodes.isEmpty()) {
             throw new BusinessException("订阅暂无可用节点");
@@ -304,11 +300,63 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         return buildSingBoxJson(subscription, nodes, baseUrl);
     }
 
+    @Override
+    public String generateBase64Config(String orderNo, List<Long> nodeIdList, String baseUrl) {
+        log.info("生成Base64配置: orderNo={}, nodeIds={}", orderNo, nodeIdList);
+
+        // 1. 查询订阅信息
+        Subscription subscription = subscriptionMapper.selectOne(
+                new LambdaQueryWrapper<Subscription>()
+                        .eq(Subscription::getOrderNo, orderNo));
+
+        if (subscription == null) {
+            throw new BusinessException("订阅不存在: " + orderNo);
+        }
+
+        // 2. 查询订阅关联的节点
+        List<Node> nodes = getSubscriptionNodesForConfig(subscription.getId(), nodeIdList);
+
+        if (nodes.isEmpty()) {
+            throw new BusinessException("订阅暂无可用节点");
+        }
+
+        // 3. 生成URI列表并Base64编码
+        StringBuilder uris = new StringBuilder();
+        for (Node node : nodes) {
+            uris.append(buildNodeUri(subscription, node)).append("\n");
+        }
+
+        return Base64.getEncoder().encodeToString(uris.toString().getBytes());
+    }
+
+    /**
+     * 构建节点URI (hysteria2/vless)
+     */
+    private String buildNodeUri(Subscription subscription, Node node) {
+        String name = node.getName();
+        String password = subscription.getOrderNo(); // 使用订单号作为密码/种子
+
+        // 简单模拟节点类型判断，实际业务中 node 表可能需要 protocol 字段
+        // 这里基于 port 或名称简单区分，或者根据需求同时返回两种协议
+        if (node.getPort() == 443) {
+            // VLESS+Reality
+            String uuid = UUID.nameUUIDFromBytes(password.getBytes()).toString();
+            return String.format(
+                    "vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=YOUR_REALITY_PUBLIC_KEY&sid=a1b2c3d4#%s",
+                    uuid, node.getIpAddress(), node.getPort(), name);
+        } else {
+            // Hysteria2
+            return String.format(
+                    "hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==#%s",
+                    password, node.getIpAddress(), node.getPort(), node.getIpAddress(), name);
+        }
+    }
+
     /**
      * 获取订阅关联的节点列表(用于配置生成)
      *
      * @param subscriptionId 订阅ID
-     * @param filterNodeIds 可选的节点ID过滤列表,为null时返回所有节点
+     * @param filterNodeIds  可选的节点ID过滤列表,为null时返回所有节点
      * @return 节点列表
      */
     private List<Node> getSubscriptionNodesForConfig(Long subscriptionId, List<Long> filterNodeIds) {
@@ -316,7 +364,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         List<NodeSubscriptionRelation> relations = nodeSubscriptionRelationMapper.selectList(
                 new LambdaQueryWrapper<NodeSubscriptionRelation>()
                         .eq(NodeSubscriptionRelation::getSubscriptionId, subscriptionId)
-        );
+                        .eq(NodeSubscriptionRelation::getStatus, 1) // 仅限有效绑定
+                        .eq(NodeSubscriptionRelation::getDeleted, 0));
 
         if (relations.isEmpty()) {
             return Collections.emptyList();
@@ -351,140 +400,229 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     /**
      * 构建Clash YAML配置
      */
-    private String buildClashYaml(Subscription subscription, List<Node> nodes, String baseUrl) {
-        StringBuilder yaml = new StringBuilder();
+    private String buildClashYaml(Subscription subscription, List<Node> nodes, String baseUrl) throws UnsupportedEncodingException {
+        String password = subscription.getOrderNo();
 
-        // 基本配置
-        yaml.append("# Clash配置文件\n");
-        yaml.append("# 订阅组: ").append(subscription.getGroupName()).append("\n");
-        yaml.append("# 订阅编号: ").append(subscription.getOrderNo()).append("\n");
-        yaml.append("\n");
-        yaml.append("port: 7890\n");
-        yaml.append("socks-port: 7891\n");
-        yaml.append("allow-lan: false\n");
-        yaml.append("mode: rule\n");
-        yaml.append("log-level: info\n");
-        yaml.append("external-controller: 127.0.0.1:9090\n");
-        yaml.append("\n");
+        // 按节点名排序
+        List<Node> sortedNodes = nodes.stream()
+                .sorted(Comparator.comparing(Node::getName))
+                .collect(Collectors.toList());
 
-        // 代理节点
-        yaml.append("proxies:\n");
-        for (Node node : nodes) {
-            yaml.append("  - name: \"").append(node.getName()).append("\"\n");
-            yaml.append("    type: hysteria2\n");
-            yaml.append("    server: ").append(node.getIpAddress()).append("\n");
-            yaml.append("    port: ").append(node.getPort()).append("\n");
-            yaml.append("    password: your-password\n"); // 实际应从配置或节点信息中获取
-            yaml.append("    sni: ").append(node.getIpAddress()).append("\n");
-            yaml.append("    skip-cert-verify: false\n");
-            yaml.append("\n");
+        StringBuilder proxiesBuilder = new StringBuilder();
+        List<String> proxyNames = new ArrayList<>();
+
+        for (Node node : sortedNodes) {
+            String uuid = UUID.nameUUIDFromBytes(StringUtils.getBytes(password,"UTF-8")).toString();
+
+            if (node.getPort() == 443) {
+                // VLESS+Reality
+                proxiesBuilder.append("  - name: \"").append(node.getName()).append("\"\n");
+                proxiesBuilder.append("    type: vless\n");
+                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
+                proxiesBuilder.append("    uuid: ").append(uuid).append("\n");
+                proxiesBuilder.append("    network: tcp\n");
+                proxiesBuilder.append("    tls: true\n");
+                proxiesBuilder.append("    udp: true\n");
+                proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                proxiesBuilder.append("    servername: www.cloudflare.com\n");
+                proxiesBuilder.append("    reality-opts:\n");
+                proxiesBuilder.append("      public-key: YOUR_REALITY_PUBLIC_KEY\n");
+                proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                proxiesBuilder.append("    client-fingerprint: chrome\n");
+            } else {
+                // Hysteria2
+                proxiesBuilder.append("  - name: \"").append(node.getName()).append("\"\n");
+                proxiesBuilder.append("    type: hysteria2\n");
+                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
+                proxiesBuilder.append("    password: ").append(password).append("\n");
+                proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
+                proxiesBuilder.append("    skip-cert-verify: false\n");
+                proxiesBuilder.append("    obfs: salamander\n");
+                proxiesBuilder.append("    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==\n");
+            }
+            proxyNames.add("      - \"" + node.getName() + "\"");
         }
 
-        // 代理组
-        yaml.append("proxy-groups:\n");
-        yaml.append("  - name: PROXY\n");
-        yaml.append("    type: select\n");
-        yaml.append("    proxies:\n");
-        for (Node node : nodes) {
-            yaml.append("      - \"").append(node.getName()).append("\"\n");
-        }
-        yaml.append("\n");
+        String proxiesStr = proxiesBuilder.toString().trim();
+        String proxyNamesStr = String.join("\n", proxyNames);
 
-        // 规则
-        yaml.append("rules:\n");
-        yaml.append("  - DOMAIN-SUFFIX,google.com,PROXY\n");
-        yaml.append("  - DOMAIN-KEYWORD,google,PROXY\n");
-        yaml.append("  - GEOIP,CN,DIRECT\n");
-        yaml.append("  - MATCH,PROXY\n");
+        String config = """
+# Clash Meta 配置文件模板
+# 订阅组: """ + subscription.getGroupName() + """
+# 订阅编号: """ + subscription.getOrderNo() + """
 
-        return yaml.toString();
+port: 7890
+socks-port: 7891
+allow-lan: false
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090
+
+proxies:
+""" + (proxiesStr.isEmpty() ? "" : proxiesStr + "\n") + """
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+""" + (proxyNamesStr.isEmpty() ? "" : proxyNamesStr + "\n") + """
+      - DIRECT
+
+rules:
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY
+""";
+
+        return config;
     }
 
     /**
      * 构建Sing-Box JSON配置
      */
-    private String buildSingBoxJson(Subscription subscription, List<Node> nodes, String baseUrl) {
-        try {
-            Map<String, Object> config = new LinkedHashMap<>();
+    private String buildSingBoxJson(Subscription subscription, List<Node> nodes, String baseUrl) throws UnsupportedEncodingException {
+        String password = subscription.getOrderNo();
 
-            // 日志配置
-            Map<String, Object> log = new LinkedHashMap<>();
-            log.put("level", "info");
-            log.put("timestamp", true);
-            config.put("log", log);
+        // 按节点名排序
+        List<Node> sortedNodes = nodes.stream()
+                .sorted(Comparator.comparing(Node::getName))
+                .collect(Collectors.toList());
 
-            // 入站配置
-            List<Map<String, Object>> inbounds = new ArrayList<>();
+        StringBuilder outboundsBuilder = new StringBuilder();
 
-            // Mixed入站(HTTP+SOCKS5)
-            Map<String, Object> mixed = new LinkedHashMap<>();
-            mixed.put("type", "mixed");
-            mixed.put("tag", "mixed-in");
-            mixed.put("listen", "127.0.0.1");
-            mixed.put("listen_port", 7890);
-            inbounds.add(mixed);
+        for (Node node : sortedNodes) {
+            String uuid = UUID.nameUUIDFromBytes(StringUtils.getBytes(password,"UTF-8")).toString();
 
-            config.put("inbounds", inbounds);
-
-            // 出站配置
-            List<Map<String, Object>> outbounds = new ArrayList<>();
-
-            // 添加节点出站
-            for (Node node : nodes) {
-                Map<String, Object> outbound = new LinkedHashMap<>();
-                outbound.put("type", "hysteria2");
-                outbound.put("tag", node.getName());
-                outbound.put("server", node.getIpAddress());
-                outbound.put("server_port", node.getPort());
-                outbound.put("password", "your-password"); // 实际应从配置或节点信息中获取
-
-                Map<String, Object> tls = new LinkedHashMap<>();
-                tls.put("enabled", true);
-                tls.put("server_name", node.getIpAddress());
-                tls.put("insecure", false);
-                outbound.put("tls", tls);
-
-                outbounds.add(outbound);
+            if (node.getPort() == 443) {
+                // VLESS+Reality
+                outboundsBuilder.append("        {\n");
+                outboundsBuilder.append("            \"tag\": \"").append(node.getName()).append("\",\n");
+                outboundsBuilder.append("            \"type\": \"vless\",\n");
+                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
+                outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n");
+                outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                outboundsBuilder.append("            \"tls\": {\n");
+                outboundsBuilder.append("                \"enabled\": true,\n");
+                outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n");
+                outboundsBuilder.append("                \"utls\": {\n");
+                outboundsBuilder.append("                    \"enabled\": true,\n");
+                outboundsBuilder.append("                    \"fingerprint\": \"chrome\"\n");
+                outboundsBuilder.append("                },\n");
+                outboundsBuilder.append("                \"reality\": {\n");
+                outboundsBuilder.append("                    \"enabled\": true,\n");
+                outboundsBuilder.append("                    \"public_key\": \"YOUR_REALITY_PUBLIC_KEY\",\n");
+                outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                outboundsBuilder.append("                }\n");
+                outboundsBuilder.append("            }\n");
+            } else {
+                // Hysteria2
+                outboundsBuilder.append("        {\n");
+                outboundsBuilder.append("            \"tag\": \"").append(node.getName()).append("\",\n");
+                outboundsBuilder.append("            \"type\": \"hysteria2\",\n");
+                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
+                outboundsBuilder.append("            \"password\": \"").append(password).append("\",\n");
+                outboundsBuilder.append("            \"obfs\": {\n");
+                outboundsBuilder.append("                \"type\": \"salamander\",\n");
+                outboundsBuilder.append("                \"password\": \"NTdhMjdhMjAwMjRkYWEzYg==\"\n");
+                outboundsBuilder.append("            },\n");
+                outboundsBuilder.append("            \"tls\": {\n");
+                outboundsBuilder.append("                \"enabled\": true,\n");
+                outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                outboundsBuilder.append("                \"alpn\": [\n");
+                outboundsBuilder.append("                    \"h3\"\n");
+                outboundsBuilder.append("                ]\n");
+                outboundsBuilder.append("            }\n");
             }
+            outboundsBuilder.append("        },\n");
+        }
 
-            // 添加direct出站
-            Map<String, Object> direct = new LinkedHashMap<>();
-            direct.put("type", "direct");
-            direct.put("tag", "direct");
-            outbounds.add(direct);
+        String finalOutbound = sortedNodes.isEmpty() ? "direct" : sortedNodes.get(0).getName();
 
-            // 添加block出站
-            Map<String, Object> block = new LinkedHashMap<>();
-            block.put("type", "block");
-            block.put("tag", "block");
-            outbounds.add(block);
+        String config = """
+{
+    "log": {
+        "level": "info",
+        "timestamp": true
+    },
+    "inbounds": [
+        {
+            "type": "mixed",
+            "tag": "mixed-in",
+            "listen": "127.0.0.1",
+            "listen_port": 7890
+        }
+    ],
+    "outbounds": [
+""" + outboundsBuilder.toString().trim() + """
+        {
+            "type": "direct",
+            "tag": "direct"
+        },
+        {
+            "type": "dns",
+            "tag": "dns-out"
+        },
+        {
+            "type": "block",
+            "tag": "block"
+        }
+    ],
+    "route": {
+        "auto_detect_interface": true,
+        "final": \"""" + finalOutbound + """
+    }
+}
+""";
 
-            config.put("outbounds", outbounds);
+        return config;
+    }
 
-            // 路由规则
-            Map<String, Object> route = new LinkedHashMap<>();
-            List<Map<String, Object>> rules = new ArrayList<>();
+    /**
+     * 从模板中渲染定义的块（类似 Helm define）
+     */
+    private String extractBlock(String template, String blockName) {
+        String startTag = "{{ define \"" + blockName + "\" }}";
+        String endTag = "{{ end }}";
 
-            // 规则示例
-            Map<String, Object> rule1 = new LinkedHashMap<>();
-            rule1.put("geosite", Arrays.asList("google", "github"));
-            rule1.put("outbound", nodes.get(0).getName());
-            rules.add(rule1);
+        int start = template.indexOf(startTag);
+        int end = template.indexOf(endTag, start);
 
-            Map<String, Object> rule2 = new LinkedHashMap<>();
-            rule2.put("geoip", "cn");
-            rule2.put("outbound", "direct");
-            rules.add(rule2);
+        if (start != -1 && end != -1) {
+            return template.substring(start + startTag.length(), end);
+        }
+        return "";
+    }
 
-            route.put("rules", rules);
-            route.put("final", nodes.get(0).getName());
-            config.put("route", route);
+    /**
+     * 清理模板定义标记及空行
+     */
+    private String cleanTemplate(String config) {
+        // 移除 {{ define ... }} 和 {{ end }} 以及前导/后缀标记
+        return config.replaceAll("(?m)^.*\\{\\{ (define|end) .*\\}\\}\r?\n?", "")
+                .replaceAll("(?m)^[ \t]*\r?\n", "") // 移除纯空白行
+                .trim();
+    }
 
-            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(config);
-
+    /**
+     * 加载模板文件
+     */
+    private String loadTemplate(String templateName) {
+        try {
+            try (java.io.InputStream is = getClass().getClassLoader()
+                    .getResourceAsStream("templates/subscription/" + templateName)) {
+                if (is == null) {
+                    throw new BusinessException("配置模板不存在: " + templateName);
+                }
+                try (java.util.Scanner scanner = new java.util.Scanner(is, "UTF-8")) {
+                    return scanner.useDelimiter("\\A").next();
+                }
+            }
         } catch (Exception e) {
-            log.error("生成Sing-Box JSON配置失败", e);
-            throw new BusinessException("配置生成失败: " + e.getMessage());
+            log.error("加载模板失败: {}", templateName, e);
+            throw new BusinessException("加载配置模板失败: " + e.getMessage());
         }
     }
 }

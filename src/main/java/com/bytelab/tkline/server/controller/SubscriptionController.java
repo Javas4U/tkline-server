@@ -24,7 +24,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 订阅管理控制器
@@ -219,34 +221,44 @@ public class SubscriptionController {
             // 解析nodeIds参数
             List<Long> nodeIdList = null;
             if (nodeIds != null && !nodeIds.isEmpty()) {
-                nodeIdList = java.util.Arrays.stream(nodeIds.split(","))
+                nodeIdList = Arrays.stream(nodeIds.split(","))
                         .map(String::trim)
                         .filter(s -> !s.isEmpty())
                         .map(Long::parseLong)
-                        .collect(java.util.stream.Collectors.toList());
+                        .collect(Collectors.toList());
             }
 
-            // 格式判断优先级: 1.显式指定format参数 2.UA判断 3.默认JSON
-            if ("json".equalsIgnoreCase(format)) {
-                // 强制JSON格式(适合浏览器查看/Karing客户端)
-                config = subscriptionService.generateJsonConfig(orderNo, nodeIdList, baseUrl);
-                contentType = "application/json";
-                filename = "subscription_" + orderNo + ".json";
-            } else if ("yaml".equalsIgnoreCase(format)) {
-                // 强制YAML格式(适合Clash客户端)
+            // 客户端及格式判断逻辑
+            String clientType = detectClientType(userAgent);
+
+            // 格式判断优先级: 1.显式指定format参数 2.UA识别 3.默认JSON
+            if ("yaml".equalsIgnoreCase(format) || "clash".equalsIgnoreCase(clientType)) {
+                // Clash 客户端或强制 YAML
                 config = subscriptionService.generateYamlConfig(orderNo, nodeIdList, baseUrl);
                 contentType = "text/yaml";
                 filename = "subscription_" + orderNo + ".yaml";
+            } else if ("json".equalsIgnoreCase(format) || "karing".equalsIgnoreCase(clientType)
+                    || "sing-box".equalsIgnoreCase(clientType)) {
+                // Karing/Sing-Box 客户端或强制 JSON
+                config = subscriptionService.generateJsonConfig(orderNo, nodeIdList, baseUrl);
+                contentType = "application/json";
+                filename = "subscription_" + orderNo + ".json";
+            } else if ("base64".equalsIgnoreCase(format) || "v2ray".equalsIgnoreCase(clientType)
+                    || "shadowsocks".equalsIgnoreCase(clientType) || "shadowrocket".equalsIgnoreCase(clientType)) {
+                // V2Ray/Shadowsocks/Shadowrocket 客户端或强制 Base64
+                config = subscriptionService.generateBase64Config(orderNo, nodeIdList, baseUrl);
+                contentType = "text/plain";
+                filename = "subscription_" + orderNo + ".txt";
             } else if (isBrowser) {
-                // 浏览器访问默认返回JSON(便于查看)
+                // 浏览器访问默认返回 JSON (便于查看)
                 config = subscriptionService.generateJsonConfig(orderNo, nodeIdList, baseUrl);
                 contentType = "application/json";
                 filename = "subscription_" + orderNo + ".json";
             } else {
-                // 非浏览器客户端默认返回YAML(兼容Clash)
-                config = subscriptionService.generateYamlConfig(orderNo, nodeIdList, baseUrl);
-                contentType = "text/yaml";
-                filename = "subscription_" + orderNo + ".yaml";
+                // 其他未知客户端默认返回 Base64 (兼容性最好)
+                config = subscriptionService.generateBase64Config(orderNo, nodeIdList, baseUrl);
+                contentType = "text/plain";
+                filename = "subscription_" + orderNo + ".txt";
             }
 
             log.info("订阅配置生成成功: orderNo={}, nodeCount={}, contentType={}, configSize={}",
@@ -277,5 +289,28 @@ public class SubscriptionController {
         }
         String ua = userAgent.toLowerCase();
         return ua.contains("mozilla") || ua.contains("chrome") || ua.contains("safari") || ua.contains("edge");
+    }
+
+    /**
+     * 根据 User-Agent 识别客户端类型
+     */
+    private String detectClientType(String userAgent) {
+        if (userAgent == null || userAgent.isEmpty()) {
+            return "unknown";
+        }
+        String ua = userAgent.toLowerCase();
+        if (ua.contains("karing"))
+            return "karing";
+        if (ua.contains("clash") || ua.contains("stash") || ua.contains("surfboard"))
+            return "clash";
+        if (ua.contains("sing-box") || ua.contains("nekobox"))
+            return "sing-box";
+        if (ua.contains("v2ray") || ua.contains("v2fly"))
+            return "v2ray";
+        if (ua.contains("shadowsocks"))
+            return "shadowsocks";
+        if (ua.contains("shadowrocket"))
+            return "shadowrocket";
+        return "unknown";
     }
 }
