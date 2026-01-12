@@ -11,6 +11,7 @@ import com.bytelab.tkline.server.dto.node.NodeCreateDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.node.NodeHeartbeatDTO;
 import com.bytelab.tkline.server.dto.node.NodeQueryDTO;
+import com.bytelab.tkline.server.dto.node.NodeUpdateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.entity.Node;
 import com.bytelab.tkline.server.entity.Subscription;
@@ -100,6 +101,19 @@ public class NodeServiceImpl implements NodeService {
         }
         node.setLastHeartbeatTime(LocalDateTime.now());
         nodeMapper.updateById(node);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateNode(NodeUpdateDTO updateDTO) {
+        Node node = nodeMapper.selectById(updateDTO.getId());
+        if (node == null) {
+            throw new BusinessException("节点不存在: " + updateDTO.getId());
+        }
+        node = nodeConverter.toEntity(updateDTO);
+        node.setUpdateBy("admin"); // TODO: 当前用户
+        nodeMapper.updateById(node);
+        log.info("Node updated: id={}", node.getId());
     }
 
     @Override

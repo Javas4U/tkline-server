@@ -7,6 +7,7 @@ import com.bytelab.tkline.server.dto.node.NodeCreateDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.node.NodeHeartbeatDTO;
 import com.bytelab.tkline.server.dto.node.NodeQueryDTO;
+import com.bytelab.tkline.server.dto.node.NodeUpdateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.service.NodeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -56,6 +57,16 @@ public class NodeController {
     @PostMapping("/heartbeat")
     public ApiResult<Void> heartbeat(@RequestBody @Valid NodeHeartbeatDTO heartbeatDTO) {
         nodeService.heartbeat(heartbeatDTO);
+        return ApiResult.success();
+    }
+
+    /**
+     * 更新节点
+     */
+    @PostMapping("/updateNode")
+    @Operation(summary = "更新节点")
+    public ApiResult<Void> updateNode(@RequestBody @Valid NodeUpdateDTO updateDTO) {
+        nodeService.updateNode(updateDTO);
         return ApiResult.success();
     }
 

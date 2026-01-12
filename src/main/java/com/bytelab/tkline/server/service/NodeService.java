@@ -2,12 +2,10 @@ package com.bytelab.tkline.server.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
-import com.bytelab.tkline.server.dto.node.NodeCreateDTO;
-import com.bytelab.tkline.server.dto.node.NodeDTO;
-import com.bytelab.tkline.server.dto.node.NodeHeartbeatDTO;
-import com.bytelab.tkline.server.dto.node.NodeQueryDTO;
+import com.bytelab.tkline.server.dto.node.*;
 
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
+import jakarta.validation.Valid;
 
 /**
  * 节点服务接口
@@ -53,4 +51,6 @@ public interface NodeService {
      * @return 订阅列表
      */
     IPage<SubscriptionDTO> pageNodeSubscriptions(Long nodeId, PageQueryDTO query);
+
+    void updateNode(@Valid NodeUpdateDTO updateDTO);
 }
