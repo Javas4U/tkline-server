@@ -29,6 +29,9 @@ public class Node {
     @TableField("description")
     private String description;
 
+    @TableField("protocols")
+    private String protocols;
+
     @TableField("upstream_quota")
     private Integer upstreamQuota;
 

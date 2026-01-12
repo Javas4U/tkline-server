@@ -24,6 +24,9 @@ public class NodeCreateDTO {
     @Size(max = 500, message = "描述长度不能超过500")
     private String description;
 
+    @Size(max = 1000, message = "协议列表JSON长度不能超过1000")
+    private String protocols;
+
     @Min(value = 0, message = "上行配额不能为负数")
     private Integer upstreamQuota;
 

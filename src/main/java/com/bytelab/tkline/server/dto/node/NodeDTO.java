@@ -16,6 +16,9 @@ public class NodeDTO {
     private String statusLabel;
     private String description;
 
+    @Schema(description = "支持的协议列表，如 [\"hy2\",\"vmess\",\"trojan\"]")
+    private String protocols;
+
     @Schema(description = "上行配额(Mbps)")
     private Integer upstreamQuota;
 
