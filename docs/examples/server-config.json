@@ -3,16 +3,29 @@
         "level": "info",
         "timestamp": true
     },
-    "experimental": {
-        "cache_file": {
+    "dns": {
+        "servers": [
+            {
+                "tag": "google",
+                "address": "8.8.8.8",
+                "detour": "direct"
+            },
+            {
+                "tag": "dns-fake",
+                "address": "fakeip"
+            }
+        ],
+        "rules": [
+            {
+                "outbound": "any",
+                "server": "dns-fake"
+            }
+        ],
+        "fakeip": {
             "enabled": true,
-            "path": "cache.db",
-            "store_fakeip": true
+            "inet4_range": "198.18.0.1/16"
         },
-        "clash_api": {
-            "external_controller": "0.0.0.0:9090",
-            "secret": "5fcd85da-f3c5-4444-b497-ea759cef4248"
-        }
+        "strategy": "ipv4_only"
     },
     "inbounds": [
         {
@@ -44,7 +57,7 @@
             "type": "tuic",
             "tag": "tuic-in",
             "listen": "::",
-            "listen_port": 8443,
+            "listen_port": 10443,
             "users": [
                 {
                     "uuid": "52a7d83e-9a51-41d4-a58e-4d987cb4a018",
@@ -62,10 +75,31 @@
             }
         },
         {
+            "type": "trojan",
+            "tag": "trojan-in",
+            "listen": "::",
+            "listen_port": 9443,
+            "users": [
+                {
+                    "password": "SUB20251208506820093413",
+                    "name": "user_12345"
+                }
+            ],
+            "tls": {
+                "enabled": true,
+                "alpn": [
+                    "h2",
+                    "http/1.1"
+                ],
+                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
+                "key_path": "/etc/sing-box/cert/privkey.pem"
+            }
+        },
+        {
             "type": "vless",
             "tag": "vless-in",
             "listen": "::",
-            "listen_port": 443,
+            "listen_port": 8443,
             "users": [
                 {
                     "uuid": "9f92a3e3-90ad-4fc4-82bf-9e7b6abceeef",
@@ -121,5 +155,12 @@
             "type": "direct",
             "tag": "direct"
         }
-    ]
+    ],
+    "experimental": {
+        "cache_file": {
+            "enabled": true,
+            "path": "/var/lib/sing-box/cache.db",
+            "store_fakeip": true
+        }
+    }
 }

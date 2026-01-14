@@ -24,7 +24,6 @@ public interface SubscriptionConverter {
     @Mapping(target = "createBy", ignore = true)
     @Mapping(target = "updateBy", ignore = true)
     @Mapping(target = "deleted", ignore = true)
-    @Mapping(target = "version", ignore = true)
     Subscription toEntity(SubscriptionCreateDTO dto);
 
     @Mapping(target = "createTime", ignore = true)

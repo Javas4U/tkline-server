@@ -27,8 +27,9 @@ public interface NodeConverter {
     @Mapping(target = "createBy", ignore = true)
     @Mapping(target = "updateBy", ignore = true)
     @Mapping(target = "deleted", ignore = true)
-    @Mapping(target = "version", ignore = true)
     @Mapping(target = "lastHeartbeatTime", ignore = true)
+    @Mapping(target = "realityPublicKey", ignore = true)  // 由 Service 层生成
+    @Mapping(target = "realityPrivateKey", ignore = true) // 由 Service 层生成
     Node toEntity(NodeCreateDTO dto);
 
     @Mapping(target = "createTime", ignore = true)
@@ -38,6 +39,8 @@ public interface NodeConverter {
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "status", ignore = true) // 状态单独接口修改
     @Mapping(target = "lastHeartbeatTime", ignore = true)
+    @Mapping(target = "realityPublicKey", ignore = true)  // 由 Service 层处理
+    @Mapping(target = "realityPrivateKey", ignore = true) // 由 Service 层处理
     Node toEntity(NodeUpdateDTO dto);
 
 }

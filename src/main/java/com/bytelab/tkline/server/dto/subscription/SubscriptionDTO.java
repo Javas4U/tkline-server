@@ -26,5 +26,4 @@ public class SubscriptionDTO {
     @Schema(description = "可用节点数")
     private Integer availableNodeCount;
 
-    private Integer version;
 }

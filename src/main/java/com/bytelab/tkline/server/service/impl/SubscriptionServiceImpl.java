@@ -1,6 +1,5 @@
 package com.bytelab.tkline.server.service.impl;
-
-import ch.qos.logback.core.util.StringUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -22,6 +21,7 @@ import com.bytelab.tkline.server.mapper.SubscriptionMapper;
 import com.bytelab.tkline.server.service.NodeSubscriptionRelationService;
 import com.bytelab.tkline.server.service.SubscriptionService;
 import com.bytelab.tkline.server.util.SubscriptionOrderGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -334,21 +334,21 @@ public class SubscriptionServiceImpl implements SubscriptionService {
      */
     private String buildNodeUri(Subscription subscription, Node node) {
         String name = node.getName();
-        String password = subscription.getOrderNo(); // 使用订单号作为密码/种子
+        // 订单号本身就是 UUID 格式，直接使用
+        String uuid = subscription.getOrderNo();
 
         // 简单模拟节点类型判断，实际业务中 node 表可能需要 protocol 字段
         // 这里基于 port 或名称简单区分，或者根据需求同时返回两种协议
         if (node.getPort() == 443) {
             // VLESS+Reality
-            String uuid = UUID.nameUUIDFromBytes(password.getBytes()).toString();
             return String.format(
                     "vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=YOUR_REALITY_PUBLIC_KEY&sid=a1b2c3d4#%s",
                     uuid, node.getIpAddress(), node.getPort(), name);
         } else {
-            // Hysteria2
+            // Hysteria2 - 使用 UUID 作为 password
             return String.format(
                     "hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==#%s",
-                    password, node.getIpAddress(), node.getPort(), node.getIpAddress(), name);
+                    uuid, node.getIpAddress(), node.getPort(), node.getIpAddress(), name);
         }
     }
 
@@ -401,7 +401,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
      * 构建Clash YAML配置
      */
     private String buildClashYaml(Subscription subscription, List<Node> nodes, String baseUrl) throws UnsupportedEncodingException {
-        String password = subscription.getOrderNo();
+        // 订单号本身就是 UUID 格式，直接作为认证凭证
+        String uuid = subscription.getOrderNo();
 
         // 按节点名排序
         List<Node> sortedNodes = nodes.stream()
@@ -412,53 +413,174 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         List<String> proxyNames = new ArrayList<>();
 
         for (Node node : sortedNodes) {
-            String uuid = UUID.nameUUIDFromBytes(StringUtils.getBytes(password,"UTF-8")).toString();
+            boolean generated = false;
 
-            if (node.getPort() == 443) {
-                // VLESS+Reality
-                proxiesBuilder.append("  - name: \"").append(node.getName()).append("\"\n");
-                proxiesBuilder.append("    type: vless\n");
-                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
-                proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
-                proxiesBuilder.append("    uuid: ").append(uuid).append("\n");
-                proxiesBuilder.append("    network: tcp\n");
-                proxiesBuilder.append("    tls: true\n");
-                proxiesBuilder.append("    udp: true\n");
-                proxiesBuilder.append("    flow: xtls-rprx-vision\n");
-                proxiesBuilder.append("    servername: www.cloudflare.com\n");
-                proxiesBuilder.append("    reality-opts:\n");
-                proxiesBuilder.append("      public-key: YOUR_REALITY_PUBLIC_KEY\n");
-                proxiesBuilder.append("      short-id: a1b2c3d4\n");
-                proxiesBuilder.append("    client-fingerprint: chrome\n");
-            } else {
-                // Hysteria2
-                proxiesBuilder.append("  - name: \"").append(node.getName()).append("\"\n");
-                proxiesBuilder.append("    type: hysteria2\n");
-                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
-                proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
-                proxiesBuilder.append("    password: ").append(password).append("\n");
-                proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
-                proxiesBuilder.append("    skip-cert-verify: false\n");
-                proxiesBuilder.append("    obfs: salamander\n");
-                proxiesBuilder.append("    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==\n");
+            if (StringUtils.isNotBlank(node.getProtocols())) {
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<>() {
+                    });
+
+                    if (!protos.isEmpty()) {
+                        // 自定义协议排序：VLESS 第一，Hysteria2 第二，其他按字母排序
+                        protos.sort((p1, p2) -> {
+                            boolean isVless1 = "vless".equalsIgnoreCase(p1) || "reality".equalsIgnoreCase(p1);
+                            boolean isVless2 = "vless".equalsIgnoreCase(p2) || "reality".equalsIgnoreCase(p2);
+                            boolean isHy1 = "hy2".equalsIgnoreCase(p1) || "hysteria2".equalsIgnoreCase(p1);
+                            boolean isHy2 = "hy2".equalsIgnoreCase(p2) || "hysteria2".equalsIgnoreCase(p2);
+
+                            if (isVless1 && !isVless2) return -1;
+                            if (!isVless1 && isVless2) return 1;
+                            if (isHy1 && !isHy2) return -1;
+                            if (!isHy1 && isHy2) return 1;
+                            return p1.compareToIgnoreCase(p2);
+                        });
+
+                        for (String proto : protos) {
+                            String proxyName = node.getName() + "-" + proto.toUpperCase();
+                            // 根据协议获取对应的标准端口
+                            int port = getProtocolPort(proto, node.getPort());
+
+                            if ("hy2".equalsIgnoreCase(proto) || "hysteria2".equalsIgnoreCase(proto)) {
+                                // Hysteria2 - 使用 UUID 作为 password
+                                proxyNames.add("      - \"" + proxyName + "\"");
+                                proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
+                                proxiesBuilder.append("    type: hysteria2\n");
+                                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    port: ").append(port).append("\n");
+                                proxiesBuilder.append("    password: ").append(uuid).append("\n");
+                                // 添加上行和下行带宽配置
+                                if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
+                                    proxiesBuilder.append("    up: ").append(node.getUpstreamQuota()).append("\n");
+                                }
+                                if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
+                                    proxiesBuilder.append("    down: ").append(node.getDownstreamQuota()).append("\n");
+                                }
+                                proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    skip-cert-verify: false\n");
+                                proxiesBuilder.append("    obfs: salamander\n");
+                                proxiesBuilder.append("    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==\n");
+                                generated = true;
+                            } else if ("vless".equalsIgnoreCase(proto) || "reality".equalsIgnoreCase(proto)) {
+                                // VLESS+Reality
+                                proxyNames.add("      - \"" + proxyName + "\"");
+                                proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
+                                proxiesBuilder.append("    type: vless\n");
+                                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    port: ").append(port).append("\n");
+                                proxiesBuilder.append("    uuid: ").append(uuid).append("\n");
+                                proxiesBuilder.append("    network: tcp\n");
+                                proxiesBuilder.append("    tls: true\n");
+                                proxiesBuilder.append("    udp: true\n");
+                                proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                                proxiesBuilder.append("    servername: www.cloudflare.com\n");
+                                proxiesBuilder.append("    reality-opts:\n");
+                                // 使用数据库中保存的 Reality 公钥
+                                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
+                                    ? node.getRealityPublicKey()
+                                    : "YOUR_REALITY_PUBLIC_KEY";
+                                proxiesBuilder.append("      public-key: ").append(publicKey).append("\n");
+                                proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                                proxiesBuilder.append("    client-fingerprint: chrome\n");
+                                generated = true;
+                            } else if ("trojan".equalsIgnoreCase(proto)) {
+                                // Trojan - 使用 UUID 作为 password
+                                proxyNames.add("      - \"" + proxyName + "\"");
+                                proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
+                                proxiesBuilder.append("    type: trojan\n");
+                                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    port: ").append(port).append("\n");
+                                proxiesBuilder.append("    password: ").append(uuid).append("\n");
+                                proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    skip-cert-verify: false\n");
+                                proxiesBuilder.append("    udp: true\n");
+                                generated = true;
+                            } else {
+                                log.warn("Unknown protocol '{}' for node '{}'", proto, node.getName());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse protocols for node '{}': {}", node.getName(), node.getProtocols(), e);
+                }
             }
-            proxyNames.add("      - \"" + node.getName() + "\"");
+
+            if (!generated) {
+                // Fallback to legacy port-based logic
+                String proxyName = node.getName();
+                proxyNames.add("      - \"" + proxyName + "\"");
+                if (node.getPort() == 8443) {
+                    // VLESS+Reality (legacy) - 端口 8443
+                    proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
+                    proxiesBuilder.append("    type: vless\n");
+                    proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                    proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
+                    proxiesBuilder.append("    uuid: ").append(uuid).append("\n");
+                    proxiesBuilder.append("    network: tcp\n");
+                    proxiesBuilder.append("    tls: true\n");
+                    proxiesBuilder.append("    udp: true\n");
+                    proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                    proxiesBuilder.append("    servername: www.cloudflare.com\n");
+                    proxiesBuilder.append("    reality-opts:\n");
+                    // 使用数据库中保存的 Reality 公钥
+                    String legacyPublicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
+                        ? node.getRealityPublicKey()
+                        : "YOUR_REALITY_PUBLIC_KEY";
+                    proxiesBuilder.append("      public-key: ").append(legacyPublicKey).append("\n");
+                    proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                    proxiesBuilder.append("    client-fingerprint: chrome\n");
+                } else {
+                    // Hysteria2 (legacy) - 使用 UUID 作为 password
+                    proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
+                    proxiesBuilder.append("    type: hysteria2\n");
+                    proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                    proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
+                    proxiesBuilder.append("    password: ").append(uuid).append("\n");
+                    // 添加上行和下行带宽配置
+                    if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
+                        proxiesBuilder.append("    up: ").append(node.getUpstreamQuota()).append("\n");
+                    }
+                    if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
+                        proxiesBuilder.append("    down: ").append(node.getDownstreamQuota()).append("\n");
+                    }
+                    proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
+                    proxiesBuilder.append("    skip-cert-verify: false\n");
+                    proxiesBuilder.append("    obfs: salamander\n");
+                    proxiesBuilder.append("    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==\n");
+                }
+            }
         }
 
-        String proxiesStr = proxiesBuilder.toString().trim();
+        // 去除末尾多余的换行，但保留缩进
+        String proxiesStr = proxiesBuilder.toString();
+        if (proxiesStr.endsWith("\n")) {
+            proxiesStr = proxiesStr.substring(0, proxiesStr.length() - 1);
+        }
         String proxyNamesStr = String.join("\n", proxyNames);
 
         String config = """
 # Clash Meta 配置文件模板
-# 订阅组: """ + subscription.getGroupName() + """
-# 订阅编号: """ + subscription.getOrderNo() + """
+# 订阅组: """ + subscription.getGroupName() + "\n" + """
+# 订阅编号: """ + subscription.getOrderNo() + "\n" + """
 
-port: 7890
-socks-port: 7891
-allow-lan: false
-mode: rule
-log-level: info
-external-controller: 127.0.0.1:9090
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.lan'
+    - localhost.ptlogin2.qq.com
+  nameserver:
+    - https://223.5.5.5/dns-query
+  fallback:
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+      - 240.0.0.0/4
 
 proxies:
 """ + (proxiesStr.isEmpty() ? "" : proxiesStr + "\n") + """
@@ -471,7 +593,17 @@ proxy-groups:
       - DIRECT
 
 rules:
+  # 局域网直连
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+  # 中国大陆流量直连
   - GEOIP,CN,DIRECT
+  - GEOSITE,CN,DIRECT
+  # 其他流量走代理
   - MATCH,PROXY
 """;
 
@@ -482,7 +614,8 @@ rules:
      * 构建Sing-Box JSON配置
      */
     private String buildSingBoxJson(Subscription subscription, List<Node> nodes, String baseUrl) throws UnsupportedEncodingException {
-        String password = subscription.getOrderNo();
+        // 订单号本身就是 UUID 格式，直接作为认证凭证
+        String uuid = subscription.getOrderNo();
 
         // 按节点名排序
         List<Node> sortedNodes = nodes.stream()
@@ -490,73 +623,193 @@ rules:
                 .collect(Collectors.toList());
 
         StringBuilder outboundsBuilder = new StringBuilder();
+        String firstTag = "direct";
 
         for (Node node : sortedNodes) {
-            String uuid = UUID.nameUUIDFromBytes(StringUtils.getBytes(password,"UTF-8")).toString();
+            boolean generated = false;
 
-            if (node.getPort() == 443) {
-                // VLESS+Reality
-                outboundsBuilder.append("        {\n");
-                outboundsBuilder.append("            \"tag\": \"").append(node.getName()).append("\",\n");
-                outboundsBuilder.append("            \"type\": \"vless\",\n");
-                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
-                outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
-                outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n");
-                outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
-                outboundsBuilder.append("            \"tls\": {\n");
-                outboundsBuilder.append("                \"enabled\": true,\n");
-                outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n");
-                outboundsBuilder.append("                \"utls\": {\n");
-                outboundsBuilder.append("                    \"enabled\": true,\n");
-                outboundsBuilder.append("                    \"fingerprint\": \"chrome\"\n");
-                outboundsBuilder.append("                },\n");
-                outboundsBuilder.append("                \"reality\": {\n");
-                outboundsBuilder.append("                    \"enabled\": true,\n");
-                outboundsBuilder.append("                    \"public_key\": \"YOUR_REALITY_PUBLIC_KEY\",\n");
-                outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
-                outboundsBuilder.append("                }\n");
-                outboundsBuilder.append("            }\n");
-            } else {
-                // Hysteria2
-                outboundsBuilder.append("        {\n");
-                outboundsBuilder.append("            \"tag\": \"").append(node.getName()).append("\",\n");
-                outboundsBuilder.append("            \"type\": \"hysteria2\",\n");
-                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
-                outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
-                outboundsBuilder.append("            \"password\": \"").append(password).append("\",\n");
-                outboundsBuilder.append("            \"obfs\": {\n");
-                outboundsBuilder.append("                \"type\": \"salamander\",\n");
-                outboundsBuilder.append("                \"password\": \"NTdhMjdhMjAwMjRkYWEzYg==\"\n");
-                outboundsBuilder.append("            },\n");
-                outboundsBuilder.append("            \"tls\": {\n");
-                outboundsBuilder.append("                \"enabled\": true,\n");
-                outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
-                outboundsBuilder.append("                \"alpn\": [\n");
-                outboundsBuilder.append("                    \"h3\"\n");
-                outboundsBuilder.append("                ]\n");
-                outboundsBuilder.append("            }\n");
+            if (StringUtils.isNotBlank(node.getProtocols())) {
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<List<String>>() {});
+
+                    if (!protos.isEmpty()) {
+                        // 自定义协议排序：VLESS 第一，Hysteria2 第二，其他按字母排序
+                        protos.sort((p1, p2) -> {
+                            boolean isVless1 = "vless".equalsIgnoreCase(p1) || "reality".equalsIgnoreCase(p1);
+                            boolean isVless2 = "vless".equalsIgnoreCase(p2) || "reality".equalsIgnoreCase(p2);
+                            boolean isHy1 = "hy2".equalsIgnoreCase(p1) || "hysteria2".equalsIgnoreCase(p1);
+                            boolean isHy2 = "hy2".equalsIgnoreCase(p2) || "hysteria2".equalsIgnoreCase(p2);
+
+                            if (isVless1 && !isVless2) return -1;
+                            if (!isVless1 && isVless2) return 1;
+                            if (isHy1 && !isHy2) return -1;
+                            if (!isHy1 && isHy2) return 1;
+                            return p1.compareToIgnoreCase(p2);
+                        });
+
+                        for (String proto : protos) {
+                            String tag = node.getName() + "-" + proto.toUpperCase();
+                            // 根据协议获取对应的标准端口
+                            int port = getProtocolPort(proto, node.getPort());
+
+                            if ("hy2".equalsIgnoreCase(proto) || "hysteria2".equalsIgnoreCase(proto)) {
+                                // Hysteria2 - 使用 UUID 作为 password
+                                outboundsBuilder.append("        {\n");
+                                outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
+                                outboundsBuilder.append("            \"type\": \"hysteria2\",\n");
+                                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
+                                outboundsBuilder.append("            \"password\": \"").append(uuid).append("\",\n");
+                                // 添加上行和下行带宽配置
+                                if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
+                                    outboundsBuilder.append("            \"up_mbps\": ").append(node.getUpstreamQuota()).append(",\n");
+                                }
+                                if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
+                                    outboundsBuilder.append("            \"down_mbps\": ").append(node.getDownstreamQuota()).append(",\n");
+                                }
+                                outboundsBuilder.append("            \"obfs\": {\n");
+                                outboundsBuilder.append("                \"type\": \"salamander\",\n");
+                                outboundsBuilder.append("                \"password\": \"NTdhMjdhMjAwMjRkYWEzYg==\"\n");
+                                outboundsBuilder.append("            },\n");
+                                outboundsBuilder.append("            \"tls\": {\n");
+                                outboundsBuilder.append("                \"enabled\": true,\n");
+                                outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("                \"alpn\": [\n");
+                                outboundsBuilder.append("                    \"h3\"\n");
+                                outboundsBuilder.append("                ]\n");
+                                outboundsBuilder.append("            }\n");
+                                outboundsBuilder.append("        },\n");
+                                if ("direct".equals(firstTag)) firstTag = tag;
+                                generated = true;
+                            } else if ("vless".equalsIgnoreCase(proto) || "reality".equalsIgnoreCase(proto)) {
+                                // VLESS+Reality
+                                outboundsBuilder.append("        {\n");
+                                outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
+                                outboundsBuilder.append("            \"type\": \"vless\",\n");
+                                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
+                                outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n"); // 客户端身份认证凭证
+                                outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                                outboundsBuilder.append("            \"tls\": {\n");
+                                outboundsBuilder.append("                \"enabled\": true,\n");
+                                outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n"); // 服务器域名 告诉服务器要伪装成哪个网站
+                                outboundsBuilder.append("                \"utls\": {\n"); // 客户端指纹 告诉服务器要使用哪个指纹 模拟真实浏览器的 TLS 握手指纹
+                                outboundsBuilder.append("                    \"enabled\": true,\n");
+                                outboundsBuilder.append("                    \"fingerprint\": \"chrome\"\n"); // 模拟 Chrome 浏览器
+                                outboundsBuilder.append("                },\n");
+                                outboundsBuilder.append("                \"reality\": {\n");
+                                outboundsBuilder.append("                    \"enabled\": true,\n");
+                                // 使用数据库中保存的 Reality 公钥
+                                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
+                                    ? node.getRealityPublicKey()
+                                    : "YOUR_REALITY_PUBLIC_KEY";
+                                outboundsBuilder.append("                    \"public_key\": \"").append(publicKey).append("\",\n");
+                                outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                                outboundsBuilder.append("                }\n");
+                                outboundsBuilder.append("            }\n");
+                                outboundsBuilder.append("        },\n");
+                                if ("direct".equals(firstTag)) firstTag = tag;
+                                generated = true;
+                            } else if ("trojan".equalsIgnoreCase(proto)) {
+                                // Trojan - 使用 UUID 作为 password
+                                outboundsBuilder.append("        {\n");
+                                outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
+                                outboundsBuilder.append("            \"type\": \"trojan\",\n");
+                                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
+                                outboundsBuilder.append("            \"password\": \"").append(uuid).append("\",\n");
+                                outboundsBuilder.append("            \"tls\": {\n");
+                                outboundsBuilder.append("                \"enabled\": true,\n");
+                                outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("                \"alpn\": [\n");
+                                outboundsBuilder.append("                    \"h2\",\n");
+                                outboundsBuilder.append("                    \"http/1.1\"\n");
+                                outboundsBuilder.append("                ]\n");
+                                outboundsBuilder.append("            }\n");
+                                outboundsBuilder.append("        },\n");
+                                if ("direct".equals(firstTag)) firstTag = tag;
+                                generated = true;
+                            } else {
+                                log.warn("Unknown protocol '{}' for node '{}'", proto, node.getName());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse protocols for node '{}': {}", node.getName(), node.getProtocols(), e);
+                }
             }
-            outboundsBuilder.append("        },\n");
+
+            if (!generated) {
+                // Fallback to legacy port-based logic
+                String tag = node.getName();
+                if (node.getPort() == 8443) {
+                    // VLESS+Reality (legacy) - 端口 8443
+                    outboundsBuilder.append("        {\n");
+                    outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
+                    outboundsBuilder.append("            \"type\": \"vless\",\n");
+                    outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                    outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
+                    outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n");
+                    outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                    outboundsBuilder.append("            \"tls\": {\n");
+                    outboundsBuilder.append("                \"enabled\": true,\n");
+                    outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n");
+                    outboundsBuilder.append("                \"utls\": {\n");
+                    outboundsBuilder.append("                    \"enabled\": true,\n");
+                    outboundsBuilder.append("                    \"fingerprint\": \"chrome\"\n");
+                    outboundsBuilder.append("                },\n");
+                    outboundsBuilder.append("                \"reality\": {\n");
+                    outboundsBuilder.append("                    \"enabled\": true,\n");
+                    outboundsBuilder.append("                    \"public_key\": \"YOUR_REALITY_PUBLIC_KEY\",\n");
+                    outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                    outboundsBuilder.append("                }\n");
+                    outboundsBuilder.append("            }\n");
+                    outboundsBuilder.append("        },\n");
+                } else {
+                    // Hysteria2 (legacy) - 使用 UUID 作为 password
+                    outboundsBuilder.append("        {\n");
+                    outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
+                    outboundsBuilder.append("            \"type\": \"hysteria2\",\n");
+                    outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                    outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
+                    outboundsBuilder.append("            \"password\": \"").append(uuid).append("\",\n");
+                    // 添加上行和下行带宽配置
+                    if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
+                        outboundsBuilder.append("            \"up_mbps\": ").append(node.getUpstreamQuota()).append(",\n");
+                    }
+                    if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
+                        outboundsBuilder.append("            \"down_mbps\": ").append(node.getDownstreamQuota()).append(",\n");
+                    }
+                    outboundsBuilder.append("            \"obfs\": {\n");
+                    outboundsBuilder.append("                \"type\": \"salamander\",\n");
+                    outboundsBuilder.append("                \"password\": \"NTdhMjdhMjAwMjRkYWEzYg==\"\n");
+                    outboundsBuilder.append("            },\n");
+                    outboundsBuilder.append("            \"tls\": {\n");
+                    outboundsBuilder.append("                \"enabled\": true,\n");
+                    outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                    outboundsBuilder.append("                \"alpn\": [\n");
+                    outboundsBuilder.append("                    \"h3\"\n");
+                    outboundsBuilder.append("                ]\n");
+                    outboundsBuilder.append("            }\n");
+                    outboundsBuilder.append("        },\n");
+                }
+                if ("direct".equals(firstTag)) firstTag = tag;
+            }
         }
 
-        String finalOutbound = sortedNodes.isEmpty() ? "direct" : sortedNodes.get(0).getName();
+        String finalOutbound = firstTag;
+
+        // 移除 outboundsBuilder 末尾的逗号和换行
+        String outboundsStr = outboundsBuilder.toString().trim();
+        if (outboundsStr.endsWith(",")) {
+            outboundsStr = outboundsStr.substring(0, outboundsStr.length() - 1);
+        }
 
         String config = """
 {
-    "log": {
-        "level": "info",
-        "timestamp": true
-    },
-    "inbounds": [
-        {
-            "type": "mixed",
-            "tag": "mixed-in",
-            "listen": "127.0.0.1",
-            "listen_port": 7890
-        }
-    ],
     "outbounds": [
-""" + outboundsBuilder.toString().trim() + """
+""" + (outboundsStr.isEmpty() ? "" : outboundsStr + ",\n") + """
         {
             "type": "direct",
             "tag": "direct"
@@ -570,9 +823,110 @@ rules:
             "tag": "block"
         }
     ],
+    "dns": {
+        "servers": [
+            {
+                "tag": "google",
+                "address": "https://8.8.8.8/dns-query",
+                "address_resolver": "local"
+            },
+            {
+                "tag": "cloudflare",
+                "address": "https://1.1.1.1/dns-query",
+                "address_resolver": "local"
+            },
+            {
+                "tag": "local",
+                "address": "223.5.5.5",
+                "detour": "direct"
+            },
+            {
+                "tag": "block",
+                "address": "rcode://success"
+            }
+        ],
+        "rules": [
+            {
+                "outbound": "any",
+                "server": "local"
+            },
+            {
+                "rule_set": "geosite-category-ads-all",
+                "server": "block"
+            },
+            {
+                "rule_set": "geosite-cn",
+                "server": "local"
+            },
+            {
+                "clash_mode": "direct",
+                "server": "local"
+            },
+            {
+                "clash_mode": "global",
+                "server": "google"
+            }
+        ],
+        "final": "google",
+        "strategy": "prefer_ipv4"
+    },
     "route": {
         "auto_detect_interface": true,
         "final": \"""" + finalOutbound + """
+",
+        "rule_set": [
+            {
+                "tag": "geosite-cn",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geoip-cn",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-category-ads-all",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+                "download_detour": "direct"
+            }
+        ],
+        "rules": [
+            {
+                "protocol": "dns",
+                "outbound": "dns-out"
+            },
+            {
+                "rule_set": "geosite-category-ads-all",
+                "outbound": "block"
+            },
+            {
+                "ip_is_private": true,
+                "outbound": "direct"
+            },
+            {
+                "clash_mode": "direct",
+                "outbound": "direct"
+            },
+            {
+                "clash_mode": "global",
+                "outbound": \"""" + finalOutbound + """
+"
+            },
+            {
+                "rule_set": [
+                    "geoip-cn",
+                    "geosite-cn"
+                ],
+                "outbound": "direct"
+            }
+        ]
     }
 }
 """;
@@ -604,6 +958,31 @@ rules:
         return config.replaceAll("(?m)^.*\\{\\{ (define|end) .*\\}\\}\r?\n?", "")
                 .replaceAll("(?m)^[ \t]*\r?\n", "") // 移除纯空白行
                 .trim();
+    }
+
+    /**
+     * 根据协议类型获取标准端口
+     *
+     * @param protocol 协议类型 (vless, hy2, trojan, tuic等)
+     * @param fallbackPort 如果协议未定义标准端口，使用的回退端口
+     * @return 协议对应的端口号
+     */
+    private int getProtocolPort(String protocol, int fallbackPort) {
+        if (protocol == null) {
+            return fallbackPort;
+        }
+
+        // 标准协议端口映射（与服务端配置一致）
+        return switch (protocol.toLowerCase()) {
+            case "vless", "reality" -> 8443;      // VLESS+Reality 使用 8443
+            case "hy2", "hysteria2" -> 443;       // Hysteria2 使用 443
+            case "trojan" -> 9443;                // Trojan 使用 9443
+            case "tuic" -> 10443;                 // TUIC 使用 10443
+            default -> {
+                log.warn("Unknown protocol '{}', using fallback port: {}", protocol, fallbackPort);
+                yield fallbackPort;
+            }
+        };
     }
 
     /**

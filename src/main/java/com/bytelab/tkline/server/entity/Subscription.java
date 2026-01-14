@@ -35,8 +35,4 @@ public class Subscription {
     @TableLogic
     @TableField("deleted")
     private Integer deleted;
-
-    @Version
-    @TableField("version")
-    private Integer version;
 }

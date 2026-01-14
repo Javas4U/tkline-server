@@ -1,7 +1,7 @@
 package com.bytelab.tkline.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bytelab.tkline.server.converter.NodeConverter;
@@ -18,7 +18,9 @@ import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.exception.BusinessException;
 import com.bytelab.tkline.server.mapper.NodeMapper;
 import com.bytelab.tkline.server.service.NodeService;
+import com.bytelab.tkline.server.util.RealityKeyUtil;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +55,14 @@ public class NodeServiceImpl implements NodeService {
         Node node = nodeConverter.toEntity(createDTO);
         node.setCreateBy("admin"); // TODO: 获取当前登录用户
         node.setUpdateBy("admin");
+
+        // 3. 检查是否包含 vless 协议，如果包含则生成 Reality 密钥对
+        if (containsVlessProtocol(createDTO.getProtocols())) {
+            Map<String, String> realityKeys = RealityKeyUtil.generateRealityKeyPair();
+            node.setRealityPublicKey(realityKeys.get("publicKey"));
+            node.setRealityPrivateKey(realityKeys.get("privateKey"));
+            log.info("Generated Reality keys for node: {}", createDTO.getName());
+        }
 
         nodeMapper.insert(node);
         log.info("Node created: id={}, name={}", node.getId(), node.getName());
@@ -106,14 +116,49 @@ public class NodeServiceImpl implements NodeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateNode(NodeUpdateDTO updateDTO) {
-        Node node = nodeMapper.selectById(updateDTO.getId());
-        if (node == null) {
+        Node existingNode = nodeMapper.selectById(updateDTO.getId());
+        if (existingNode == null) {
             throw new BusinessException("节点不存在: " + updateDTO.getId());
         }
-        node = nodeConverter.toEntity(updateDTO);
-        node.setUpdateBy("admin"); // TODO: 当前用户
-        nodeMapper.updateById(node);
-        log.info("Node updated: id={}", node.getId());
+
+        // 检查协议是否包含 vless
+        boolean hadVless = containsVlessProtocol(existingNode.getProtocols());
+        boolean hasVless = containsVlessProtocol(updateDTO.getProtocols());
+
+        // 创建 UpdateWrapper 用于更新
+        LambdaUpdateWrapper<Node> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Node::getId, updateDTO.getId());
+
+        // 更新基本字段
+        updateWrapper.set(Node::getName, updateDTO.getName())
+                .set(Node::getIpAddress, updateDTO.getIpAddress())
+                .set(Node::getPort, updateDTO.getPort())
+                .set(Node::getRegion, updateDTO.getRegion())
+                .set(Node::getDescription, updateDTO.getDescription())
+                .set(Node::getProtocols, updateDTO.getProtocols())
+                .set(Node::getUpstreamQuota, updateDTO.getUpstreamQuota())
+                .set(Node::getDownstreamQuota, updateDTO.getDownstreamQuota())
+                .set(Node::getUpdateBy, "admin"); // TODO: 当前用户
+
+        // 根据协议变化处理 Reality 密钥
+        // 如果之前没有 vless，现在有了，则生成新的 Reality 密钥对
+        if (!hadVless && hasVless) {
+            Map<String, String> realityKeys = RealityKeyUtil.generateRealityKeyPair();
+            updateWrapper.set(Node::getRealityPublicKey, realityKeys.get("publicKey"))
+                    .set(Node::getRealityPrivateKey, realityKeys.get("privateKey"));
+            log.info("Generated new Reality keys for node: {}", updateDTO.getId());
+        }
+        // 如果之前有 vless，现在没有了，则清除 Reality 密钥
+        else if (hadVless && !hasVless) {
+            updateWrapper.set(Node::getRealityPublicKey, null)
+                    .set(Node::getRealityPrivateKey, null);
+            log.info("Removed Reality keys for node: {}", updateDTO.getId());
+        }
+        // 如果之前有 vless，现在还有，则不修改 Reality 密钥（保持原值）
+        // 不需要在 updateWrapper 中设置这两个字段
+
+        nodeMapper.update(null, updateWrapper);
+        log.info("Node updated: id={}", updateDTO.getId());
     }
 
     @Override
@@ -129,5 +174,19 @@ public class NodeServiceImpl implements NodeService {
 
         // 转换结果
         return result.convert(subscriptionConverter::toDTO);
+    }
+
+    /**
+     * 检查协议列表中是否包含 vless 协议
+     *
+     * @param protocols 协议列表 JSON 字符串，如 ["hy2","vless","vmess"]
+     * @return true 如果包含 vless
+     */
+    private boolean containsVlessProtocol(String protocols) {
+        if (protocols == null || protocols.isEmpty()) {
+            return false;
+        }
+        // 简单检查是否包含 "vless" 字符串（忽略大小写）
+        return protocols.toLowerCase().contains("vless");
     }
 }

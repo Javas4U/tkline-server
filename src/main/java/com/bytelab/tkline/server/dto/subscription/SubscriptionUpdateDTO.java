@@ -27,6 +27,4 @@ public class SubscriptionUpdateDTO {
     @Schema(description = "描述")
     private String description;
 
-    @NotNull(message = "版本号不能为空")
-    private Integer version;
 }

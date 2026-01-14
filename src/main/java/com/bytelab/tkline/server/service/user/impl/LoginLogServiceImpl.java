@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.bytelab.tkline.server.entity.SysUser;
 import com.bytelab.tkline.server.entity.UserLoginLog;
 import com.bytelab.tkline.server.mapper.UserLoginLogMapper;
+import com.bytelab.tkline.server.mapper.UserMapper;
 import com.bytelab.tkline.server.service.user.LoginLogService;
 import com.bytelab.tkline.server.util.HttpUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +29,7 @@ import java.util.List;
 public class LoginLogServiceImpl implements LoginLogService {
 
     private final UserLoginLogMapper loginLogMapper;
+    private final UserMapper userMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -65,25 +68,33 @@ public class LoginLogServiceImpl implements LoginLogService {
     @Transactional(rollbackFor = Exception.class)
     public Long recordLoginFailure(String username, String failReason, HttpServletRequest request) {
         UserLoginLog loginLog = new UserLoginLog();
-        
+
+        // 根据用户名查询用户ID
+        SysUser user = userMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+        );
+
         // 基本信息
+        // 如果用户存在则设置真实ID，否则设置0表示用户不存在
+        loginLog.setUserId(user != null ? user.getId() : 0L);
         loginLog.setUsername(username);
         loginLog.setLoginStatus(0);  // 失败
         loginLog.setLoginType("PASSWORD");
         loginLog.setFailReason(failReason);
-        
+
         // 解析请求信息
         loginLog.setLoginIp(HttpUtil.getClientIp(request));
         loginLog.setBrowser(HttpUtil.getBrowser(request));
         loginLog.setOs(HttpUtil.getOperatingSystem(request));
         loginLog.setDeviceType(HttpUtil.getDeviceType(request));
         loginLog.setDeviceId(HttpUtil.generateDeviceId(request));
-        
+
         loginLogMapper.insert(loginLog);
-        
-        log.warn("记录登录失败日志，username: {}, ip: {}, reason: {}", 
-                username, loginLog.getLoginIp(), failReason);
-        
+
+        log.warn("记录登录失败日志，username: {}, userId: {}, ip: {}, reason: {}",
+                username, user != null ? user.getId() : "未知", loginLog.getLoginIp(), failReason);
+
         return loginLog.getId();
     }
 
