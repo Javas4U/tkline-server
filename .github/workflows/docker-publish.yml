@@ -84,9 +84,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # 优化缓存策略
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           # 🚀 性能优化:只构建 amd64,arm64 按需构建
           platforms: linux/amd64
           # 启用内联缓存和 Maven 缓存挂载
@@ -95,7 +92,7 @@ jobs:
           # 启用并行构建
           provenance: false
           sbom: false
-          # 启用缓存挂载优化
+          # 优化缓存策略 - 使用多 scope 缓存
           cache-from: |
             type=gha,scope=buildkit
             type=gha,scope=maven
