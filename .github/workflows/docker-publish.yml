@@ -29,6 +29,15 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      - name: 设置 Maven 缓存
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -36,6 +45,8 @@ jobs:
           driver-opts: |
             image=moby/buildkit:latest
             network=host
+          # 启用更激进的 BuildKit 优化参数
+          buildkitd-flags: --allow-insecure-entitlement network.host --allow-insecure-entitlement security.insecure
 
       - name: 登录到阿里云容器镜像服务 ACR
         if: github.event_name != 'pull_request'
@@ -60,7 +71,12 @@ jobs:
           flavor: |
             latest=false
 
+      - name: 记录构建开始时间
+        id: build-start
+        run: echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: 构建并推送 Docker 镜像
+        id: docker-build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -73,16 +89,30 @@ jobs:
           cache-to: type=gha,mode=max
           # 🚀 性能优化:只构建 amd64,arm64 按需构建
           platforms: linux/amd64
-          # 启用内联缓存
+          # 启用内联缓存和 Maven 缓存挂载
           build-args: |
             BUILDKIT_INLINE_CACHE=1
           # 启用并行构建
           provenance: false
           sbom: false
+          # 启用缓存挂载优化
+          cache-from: |
+            type=gha,scope=buildkit
+            type=gha,scope=maven
+          cache-to: type=gha,mode=max,scope=buildkit
 
-      - name: 输出镜像信息
+      - name: 计算构建耗时并输出镜像信息
         run: |
+          # 计算构建耗时
+          BUILD_START=${{ steps.build-start.outputs.timestamp }}
+          BUILD_END=$(date +%s)
+          BUILD_DURATION=$((BUILD_END - BUILD_START))
+          BUILD_MINUTES=$((BUILD_DURATION / 60))
+          BUILD_SECONDS=$((BUILD_DURATION % 60))
+
           echo "### Docker 镜像构建成功 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**构建耗时:** ${BUILD_MINUTES}分${BUILD_SECONDS}秒 (总计 ${BUILD_DURATION}秒)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**镜像标签:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -90,5 +120,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**构建平台:** linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**镜像摘要:** ${{ steps.docker-build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**阿里云 ACR 仓库:** ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/tkline-server" >> $GITHUB_STEP_SUMMARY

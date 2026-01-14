@@ -4,11 +4,16 @@ WORKDIR /app
 
 # 复制 pom.xml 并下载依赖（利用 Docker 缓存）
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+# 启用并行下载和离线模式准备
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn dependency:go-offline -B -T 1C
 
 # 复制源代码并构建
 COPY src ./src
-RUN mvn clean package -DskipTests -B
+# 启用多线程构建（1C = 每个 CPU 核心 1 个线程）
+# 使用缓存挂载加速 Maven 构建
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn clean package -DskipTests -B -T 1C
 
 # 运行阶段
 FROM eclipse-temurin:17-jre-alpine

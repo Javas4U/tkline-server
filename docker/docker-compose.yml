@@ -1,0 +1,50 @@
+services:
+  # TKLine 应用服务
+  app:
+    image: registry.cn-hangzhou.aliyuncs.com/bytelab/tkline-server:latest  # 请替换为你的 ACR 镜像地址
+    container_name: tkline-server
+    restart: unless-stopped
+    environment:
+      # 服务器配置
+      SERVER_PORT: ${SERVER_PORT:-8081}
+
+      # 数据库配置（连接到外部 MySQL）
+      DB_HOST: ${DB_HOST:-localhost}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-tkline}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      # JWT配置
+      # 生产环境必须修改此密钥！建议使用 64 位随机字符串
+      # 生成方法: openssl rand -hex 64
+      JWT_SECRET: ${JWT_SECRET:-25ce66ee090fc4e2d272289dc1a2e54d692cfbd35bbf96e60b2c308b3a0b2a15f7d7f38051ccff27038d5fc397dd09badc2c4ce52d089867c957cfbaa94c475e}
+
+      # 邮箱配置
+      MAIL_HOST: ${MAIL_HOST:-smtpdm.aliyun.com}
+      MAIL_PORT: ${MAIL_PORT:-465}
+      MAIL_USERNAME: ${MAIL_USERNAME:-noreply@mail.example.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-your_mail_password}
+      MAIL_PROTOCOL: ${MAIL_PROTOCOL:-smtp}
+      MAIL_REPLYTO: ${MAIL_REPLYTO:-example@126.com}
+
+      # SpringDoc 配置
+      # 生产环境建议设置为 false
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-true}
+
+      # 日志配置
+      # 可选值: trace, debug, info, warn, error
+      LOG_LEVEL_APP: ${LOG_LEVEL_APP:-info}
+      LOG_LEVEL_MYBATIS: ${LOG_LEVEL_MYBATIS:-warn}
+
+      # 时区配置
+      TZ: Asia/Shanghai
+    ports:
+      - "${SERVER_PORT:-8081}:8081"
+    network_mode: host  # 使用宿主机网络，便于连接外部数据库
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

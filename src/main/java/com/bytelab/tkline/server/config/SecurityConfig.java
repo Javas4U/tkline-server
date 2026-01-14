@@ -97,7 +97,7 @@ public class SecurityConfig {
                 // 配置URL访问权限
                 .authorizeHttpRequests(auth -> auth
                         // 健康检查接口（公开，用于Docker健康检查）
-                        .requestMatchers("/api/health").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
 
                         // 用户登录和注册相关（公开）
                         .requestMatchers("/api/user/login").permitAll()

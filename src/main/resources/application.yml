@@ -77,10 +77,10 @@ mybatis-plus:
 # SpringDoc 配置
 springdoc:
   api-docs:
-    enabled: true
+    enabled: ${SPRINGDOC_ENABLED:true}
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    enabled: ${SPRINGDOC_ENABLED:true}
     path: /swagger-ui.html
     persist-authorization: true
     display-request-duration: true
@@ -91,6 +91,21 @@ springdoc:
     - group: 'default'
       paths-to-match: '/**'
       packages-to-scan: com.bytelab.tkline.server
+
+# Actuator 配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      base-path: /actuator
+  endpoint:
+    health:
+      enabled: true
+      show-details: when-authorized
+  health:
+    defaults:
+      enabled: true
 
 # 日志配置
 logging:
