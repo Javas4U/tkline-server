@@ -29,15 +29,6 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 设置 Maven 缓存
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -86,17 +77,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # 🚀 性能优化:只构建 amd64,arm64 按需构建
           platforms: linux/amd64
-          # 启用内联缓存和 Maven 缓存挂载
+          # 启用内联缓存
           build-args: |
             BUILDKIT_INLINE_CACHE=1
           # 启用并行构建
           provenance: false
           sbom: false
-          # 优化缓存策略 - 使用多 scope 缓存
-          cache-from: |
-            type=gha,scope=buildkit
-            type=gha,scope=maven
-          cache-to: type=gha,mode=max,scope=buildkit
+          # 优化缓存策略 - 使用 GitHub Actions 缓存
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: 计算构建耗时并输出镜像信息
         run: |
