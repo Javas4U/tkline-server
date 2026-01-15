@@ -2,29 +2,10 @@
 # 订阅组:测试订阅003
 # 订阅编号:3a7ca20a-4e92-408c-af5b-8a69abbd0015
 
-dns:
-  enable: true
-  ipv6: false
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter:
-    - '*.lan'
-    - localhost.ptlogin2.qq.com
-  nameserver:
-    - https://223.5.5.5/dns-query
-  fallback:
-    - https://1.1.1.1/dns-query
-    - https://8.8.8.8/dns-query
-  fallback-filter:
-    geoip: true
-    geoip-code: CN
-    ipcidr:
-      - 240.0.0.0/4
-
 proxies:
-  - name: "美国-洛杉矶-VLESS"
+  - name: "中国-香港-VLESS"
     type: vless
-    server: apexlos.bytelab.com.cn
+    server: apexhk1.bytelab.com.cn
     port: 8443
     uuid: 3a7ca20a-4e92-408c-af5b-8a69abbd0015
     network: tcp
@@ -33,26 +14,26 @@ proxies:
     flow: xtls-rprx-vision
     servername: www.cloudflare.com
     reality-opts:
-      public-key: gHho/NpQBENanKX1lTb9MQPpb7ClNC/Vv6DH3THfij4=
+      public-key: qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU
       short-id: a1b2c3d4
     client-fingerprint: chrome
-  - name: "美国-洛杉矶-HY2"
+  - name: "中国-香港-HY2"
     type: hysteria2
-    server: apexlos.bytelab.com.cn
+    server: apexhk1.bytelab.com.cn
     port: 443
     password: 3a7ca20a-4e92-408c-af5b-8a69abbd0015
-    up: 150
-    down: 150
-    sni: apexlos.bytelab.com.cn
+    up: 50
+    down: 50
+    sni: apexhk1.bytelab.com.cn
     skip-cert-verify: false
     obfs: salamander
     obfs-password: NTdhMjdhMjAwMjRkYWEzYg==
-  - name: "美国-洛杉矶-TROJAN"
+  - name: "中国-香港-TROJAN"
     type: trojan
-    server: apexlos.bytelab.com.cn
+    server: apexhk1.bytelab.com.cn
     port: 9443
     password: 3a7ca20a-4e92-408c-af5b-8a69abbd0015
-    sni: apexlos.bytelab.com.cn
+    sni: apexhk1.bytelab.com.cn
     skip-cert-verify: false
     udp: true
 
@@ -60,9 +41,9 @@ proxy-groups:
   - name: PROXY
     type: select
     proxies:
-      - "美国-洛杉矶-VLESS"
-      - "美国-洛杉矶-HY2"
-      - "美国-洛杉矶-TROJAN"
+      - "中国-香港-VLESS"
+      - "中国-香港-HY2"
+      - "中国-香港-TROJAN"
       - DIRECT
 
 rules:

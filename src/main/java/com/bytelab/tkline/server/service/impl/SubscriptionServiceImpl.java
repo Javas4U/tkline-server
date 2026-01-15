@@ -378,7 +378,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                 // VLESS+Reality: vless://uuid@host:port?params
                 String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
                         ? node.getRealityPublicKey()
-                        : "YOUR_REALITY_PUBLIC_KEY";
+                        : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
                 return String.format(
                         "vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=a1b2c3d4#%s",
                         uuid, node.getIpAddress(), port, publicKey, nodeName);
@@ -521,7 +521,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                                 // 使用数据库中保存的 Reality 公钥
                                 String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
                                     ? node.getRealityPublicKey()
-                                    : "YOUR_REALITY_PUBLIC_KEY";
+                                    : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
                                 proxiesBuilder.append("      public-key: ").append(publicKey).append("\n");
                                 proxiesBuilder.append("      short-id: a1b2c3d4\n");
                                 proxiesBuilder.append("    client-fingerprint: chrome\n");
@@ -568,7 +568,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                     // 使用数据库中保存的 Reality 公钥
                     String legacyPublicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
                         ? node.getRealityPublicKey()
-                        : "YOUR_REALITY_PUBLIC_KEY";
+                        : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
                     proxiesBuilder.append("      public-key: ").append(legacyPublicKey).append("\n");
                     proxiesBuilder.append("      short-id: a1b2c3d4\n");
                     proxiesBuilder.append("    client-fingerprint: chrome\n");
@@ -605,25 +605,6 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
 # Clash Meta 配置文件模板
 # 订阅组: """ + subscription.getGroupName() + "\n" + """
 # 订阅编号: """ + subscription.getOrderNo() + "\n" + """
-
-dns:
-  enable: true
-  ipv6: false
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter:
-    - '*.lan'
-    - localhost.ptlogin2.qq.com
-  nameserver:
-    - https://223.5.5.5/dns-query
-  fallback:
-    - https://1.1.1.1/dns-query
-    - https://8.8.8.8/dns-query
-  fallback-filter:
-    geoip: true
-    geoip-code: CN
-    ipcidr:
-      - 240.0.0.0/4
 
 proxies:
 """ + (proxiesStr.isEmpty() ? "" : proxiesStr + "\n") + """
@@ -746,7 +727,7 @@ rules:
                                 // 使用数据库中保存的 Reality 公钥
                                 String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
                                     ? node.getRealityPublicKey()
-                                    : "YOUR_REALITY_PUBLIC_KEY";
+                                    : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
                                 outboundsBuilder.append("                    \"public_key\": \"").append(publicKey).append("\",\n");
                                 outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
                                 outboundsBuilder.append("                }\n");
@@ -804,7 +785,7 @@ rules:
                     outboundsBuilder.append("                },\n");
                     outboundsBuilder.append("                \"reality\": {\n");
                     outboundsBuilder.append("                    \"enabled\": true,\n");
-                    outboundsBuilder.append("                    \"public_key\": \"YOUR_REALITY_PUBLIC_KEY\",\n");
+                    outboundsBuilder.append("                    \"public_key\": \"").append(node.getRealityPublicKey()).append("\",\n");
                     outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
                     outboundsBuilder.append("                }\n");
                     outboundsBuilder.append("            }\n");
