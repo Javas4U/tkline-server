@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.converter.NodeConverter;
 import com.bytelab.tkline.server.converter.SubscriptionConverter;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
@@ -33,9 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NodeServiceImpl implements NodeService {
+public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements NodeService {
 
-    private final NodeMapper nodeMapper;
     private final NodeConverter nodeConverter;
 
     private final SubscriptionConverter subscriptionConverter;
@@ -45,7 +45,7 @@ public class NodeServiceImpl implements NodeService {
     public Long createNode(NodeCreateDTO createDTO) {
         // 1. 检查名称是否存在
         System.out.println("Checking node name: " + createDTO.getName());
-        boolean exists = nodeMapper.exists(new LambdaQueryWrapper<Node>()
+        boolean exists = this.exists(new LambdaQueryWrapper<Node>()
                 .eq(Node::getName, createDTO.getName()));
         if (exists) {
             throw new BusinessException("节点名称已存在: " + createDTO.getName());
@@ -64,7 +64,7 @@ public class NodeServiceImpl implements NodeService {
             log.info("Generated Reality keys for node: {}", createDTO.getName());
         }
 
-        nodeMapper.insert(node);
+        this.save(node);
         log.info("Node created: id={}, name={}", node.getId(), node.getName());
 
         return node.getId();
@@ -72,7 +72,7 @@ public class NodeServiceImpl implements NodeService {
 
     @Override
     public NodeDTO getNodeDetail(Long id) {
-        Node node = nodeMapper.selectById(id);
+        Node node = this.getById(id);
         if (node == null) {
             throw new BusinessException("节点不存在: " + id);
         }
@@ -99,24 +99,24 @@ public class NodeServiceImpl implements NodeService {
 
         wrapper.orderByDesc(Node::getId);
 
-        IPage<Node> result = nodeMapper.selectPage(page, wrapper);
+        IPage<Node> result = this.page(page, wrapper);
         return result.convert(nodeConverter::toDTO);
     }
 
     @Override
     public void heartbeat(NodeHeartbeatDTO heartbeatDTO) {
-        Node node = nodeMapper.selectById(heartbeatDTO.getId());
+        Node node = this.getById(heartbeatDTO.getId());
         if (node == null) {
             throw new RuntimeException("节点不存在");
         }
         node.setLastHeartbeatTime(LocalDateTime.now());
-        nodeMapper.updateById(node);
+        this.updateById(node);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateNode(NodeUpdateDTO updateDTO) {
-        Node existingNode = nodeMapper.selectById(updateDTO.getId());
+        Node existingNode = this.getById(updateDTO.getId());
         if (existingNode == null) {
             throw new BusinessException("节点不存在: " + updateDTO.getId());
         }
@@ -157,7 +157,7 @@ public class NodeServiceImpl implements NodeService {
         // 如果之前有 vless，现在还有，则不修改 Reality 密钥（保持原值）
         // 不需要在 updateWrapper 中设置这两个字段
 
-        nodeMapper.update(null, updateWrapper);
+        this.update(null, updateWrapper);
         log.info("Node updated: id={}", updateDTO.getId());
     }
 
@@ -168,8 +168,8 @@ public class NodeServiceImpl implements NodeService {
         Page<Subscription> page = new Page<>(
                 query.getPage(), query.getPageSize());
 
-        // 执行查询
-        IPage<Subscription> result = nodeMapper.selectSubscriptionsByNodeId(page,
+        // 执行查询 - 使用自定义SQL需要用baseMapper
+        IPage<Subscription> result = baseMapper.selectSubscriptionsByNodeId(page,
                 nodeId);
 
         // 转换结果

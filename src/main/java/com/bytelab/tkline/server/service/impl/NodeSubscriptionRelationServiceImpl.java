@@ -1,6 +1,7 @@
 package com.bytelab.tkline.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
 import com.bytelab.tkline.server.dto.relation.RelationBindDTO;
 import com.bytelab.tkline.server.entity.NodeSubscriptionRelation;
@@ -27,9 +28,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRelationService {
+public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscriptionRelationMapper, NodeSubscriptionRelation> implements NodeSubscriptionRelationService {
 
-    private final NodeSubscriptionRelationMapper relationMapper;
     private final NodeMapper nodeMapper;
     private final com.bytelab.tkline.server.mapper.SubscriptionMapper subscriptionMapper;
 
@@ -45,7 +45,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
         }
 
         // 2. 查询已存在的绑定关系
-        List<NodeSubscriptionRelation> existingRelations = relationMapper.selectList(
+        List<NodeSubscriptionRelation> existingRelations = this.list(
                 new LambdaQueryWrapper<NodeSubscriptionRelation>()
                         .eq(NodeSubscriptionRelation::getNodeId, nodeId)
                         .eq(NodeSubscriptionRelation::getDeleted, 0));
@@ -74,7 +74,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
 
         // 4. 批量插入
         if (!toInsert.isEmpty()) {
-            relationMapper.insertBatch(toInsert);
+            baseMapper.insertBatch(toInsert);
             log.info("Bound {} subscriptions to node {}", toInsert.size(), nodeId);
         }
     }
@@ -119,7 +119,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
         }
 
         if (!toInsert.isEmpty()) {
-            relationMapper.insertBatch(toInsert);
+            baseMapper.insertBatch(toInsert);
             log.info("Batch bound {} node-subscription relations", toInsert.size());
         }
     }
@@ -132,7 +132,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
         }
 
         // 1. 查询已存在的绑定关系
-        List<NodeSubscriptionRelation> existingRelations = relationMapper.selectList(
+        List<NodeSubscriptionRelation> existingRelations = this.list(
                 new LambdaQueryWrapper<NodeSubscriptionRelation>()
                         .eq(NodeSubscriptionRelation::getSubscriptionId, subscriptionId)
                         .eq(NodeSubscriptionRelation::getDeleted, 0));
@@ -156,7 +156,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
                 relation.setDeleted(1);
                 relation.setUpdateTime(LocalDateTime.now());
                 relation.setUpdateBy("admin"); // TODO: current user
-                relationMapper.updateById(relation);
+                this.updateById(relation);
             }
             log.info("Deleted {} node relations for subscription {}", idsToDelete.size(), subscriptionId);
         }
@@ -181,7 +181,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
 
         // 4. 批量插入
         if (!toInsert.isEmpty()) {
-            relationMapper.insertBatch(toInsert);
+            baseMapper.insertBatch(toInsert);
             log.info("Added {} node relations for subscription {}", toInsert.size(), subscriptionId);
         }
     }
@@ -194,7 +194,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
         }
 
         // 1. 查询已存在的绑定关系
-        List<NodeSubscriptionRelation> existingRelations = relationMapper.selectList(
+        List<NodeSubscriptionRelation> existingRelations = this.list(
                 new LambdaQueryWrapper<NodeSubscriptionRelation>()
                         .eq(NodeSubscriptionRelation::getSubscriptionId, subscriptionId)
                         .eq(NodeSubscriptionRelation::getDeleted, 0));
@@ -220,7 +220,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
                 relation.setDeleted(1);
                 relation.setUpdateTime(LocalDateTime.now());
                 relation.setUpdateBy("admin"); // TODO: current user
-                relationMapper.updateById(relation);
+                this.updateById(relation);
             }
             log.info("Deleted {} node relations for subscription {}", idsToDelete.size(), subscriptionId);
         }
@@ -248,7 +248,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
                 relation.setCreateTime(now);
                 relation.setCreateBy("admin"); // TODO: current user
                 relation.setDeleted(0);
-                relationMapper.insert(relation);
+                this.save(relation);
             } else {
                 // 更新已存在的关系
                 NodeSubscriptionRelation existing = existingRelations.stream()
@@ -263,7 +263,7 @@ public class NodeSubscriptionRelationServiceImpl implements NodeSubscriptionRela
                     existing.setStatus(binding.getStatus() != null ? binding.getStatus() : existing.getStatus());
                     existing.setUpdateTime(now);
                     existing.setUpdateBy("admin"); // TODO: current user
-                    relationMapper.updateById(existing);
+                    this.updateById(existing);
                 }
             }
         }

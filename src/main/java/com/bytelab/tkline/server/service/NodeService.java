@@ -1,16 +1,18 @@
 package com.bytelab.tkline.server.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.*;
 
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
+import com.bytelab.tkline.server.entity.Node;
 import jakarta.validation.Valid;
 
 /**
  * 节点服务接口
  */
-public interface NodeService {
+public interface NodeService extends IService<Node> {
 
     /**
      * 创建节点

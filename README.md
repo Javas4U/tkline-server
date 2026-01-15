@@ -146,7 +146,7 @@ services:
     restart: unless-stopped
     environment:
       # 服务器配置
-      SERVER_PORT: ${SERVER_PORT:-8081}
+      SERVER_PORT: ${SERVER_PORT:-8080}
 
       # 数据库配置（连接到外部 MySQL）
       DB_HOST: ${DB_HOST:-localhost}
@@ -180,10 +180,10 @@ services:
       # 时区配置
       TZ: Asia/Shanghai
     ports:
-      - "${SERVER_PORT:-8081}:8081"
+      - "${SERVER_PORT:-8080}:8080"
     network_mode: host  # 使用宿主机网络，便于连接外部数据库
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -235,8 +235,8 @@ mvn spring-boot:run
 
 项目启动后访问：
 
-- Swagger UI: http://localhost:8081/swagger-ui.html
-- API Docs: http://localhost:8081/v3/api-docs
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- API Docs: http://localhost:8080/v3/api-docs
 
 ## API 端点
 

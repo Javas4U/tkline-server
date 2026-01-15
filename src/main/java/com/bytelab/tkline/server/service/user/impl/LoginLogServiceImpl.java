@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.entity.SysUser;
 import com.bytelab.tkline.server.entity.UserLoginLog;
 import com.bytelab.tkline.server.mapper.UserLoginLogMapper;
@@ -26,9 +27,8 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class LoginLogServiceImpl implements LoginLogService {
+public class LoginLogServiceImpl extends ServiceImpl<UserLoginLogMapper, UserLoginLog> implements LoginLogService {
 
-    private final UserLoginLogMapper loginLogMapper;
     private final UserMapper userMapper;
 
     @Override
@@ -55,8 +55,8 @@ public class LoginLogServiceImpl implements LoginLogService {
                 java.time.Instant.ofEpochMilli(tokenExpireTime),
                 java.time.ZoneId.systemDefault()
         ));
-        
-        loginLogMapper.insert(loginLog);
+
+        this.save(loginLog);
         
         log.info("记录登录成功日志，userId: {}, ip: {}, device: {}", 
                 userId, loginLog.getLoginIp(), loginLog.getDeviceType());
@@ -90,7 +90,7 @@ public class LoginLogServiceImpl implements LoginLogService {
         loginLog.setDeviceType(HttpUtil.getDeviceType(request));
         loginLog.setDeviceId(HttpUtil.generateDeviceId(request));
 
-        loginLogMapper.insert(loginLog);
+        this.save(loginLog);
 
         log.warn("记录登录失败日志，username: {}, userId: {}, ip: {}, reason: {}",
                 username, user != null ? user.getId() : "未知", loginLog.getLoginIp(), failReason);
@@ -104,9 +104,9 @@ public class LoginLogServiceImpl implements LoginLogService {
         LambdaUpdateWrapper<UserLoginLog> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(UserLoginLog::getToken, token)
                 .set(UserLoginLog::getLogoutTime, LocalDateTime.now());
-        
+
         // 计算在线时长
-        UserLoginLog loginLog = loginLogMapper.selectOne(
+        UserLoginLog loginLog = this.getOne(
                 new LambdaQueryWrapper<UserLoginLog>()
                         .eq(UserLoginLog::getToken, token)
         );
@@ -118,8 +118,8 @@ public class LoginLogServiceImpl implements LoginLogService {
             log.info("记录登出日志，userId: {}, onlineDuration: {}秒", 
                     loginLog.getUserId(), duration);
         }
-        
-        loginLogMapper.update(null, updateWrapper);
+
+        this.update(null, updateWrapper);
     }
 
     @Override
@@ -129,8 +129,8 @@ public class LoginLogServiceImpl implements LoginLogService {
         LambdaQueryWrapper<UserLoginLog> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserLoginLog::getUserId, userId)
                 .orderByDesc(UserLoginLog::getCreateTime);
-        
-        IPage<UserLoginLog> result = loginLogMapper.selectPage(pageParam, wrapper);
+
+        IPage<UserLoginLog> result = this.page(pageParam, wrapper);
         return result.getRecords();
     }
 
@@ -142,15 +142,15 @@ public class LoginLogServiceImpl implements LoginLogService {
                 .isNull(UserLoginLog::getLogoutTime)
                 .gt(UserLoginLog::getTokenExpireTime, LocalDateTime.now())
                 .orderByDesc(UserLoginLog::getCreateTime);
-        
-        return loginLogMapper.selectList(wrapper);
+
+        return this.list(wrapper);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean forceLogout(Long loginLogId, Long userId) {
         // 验证权限：只能下线自己的设备
-        UserLoginLog loginLog = loginLogMapper.selectById(loginLogId);
+        UserLoginLog loginLog = this.getById(loginLogId);
         if (loginLog == null || !loginLog.getUserId().equals(userId)) {
             log.warn("强制下线失败：无权限，loginLogId: {}, userId: {}", loginLogId, userId);
             return false;
@@ -165,8 +165,8 @@ public class LoginLogServiceImpl implements LoginLogService {
             long duration = Duration.between(loginLog.getCreateTime(), LocalDateTime.now()).getSeconds();
             updateWrapper.set(UserLoginLog::getOnlineDuration, (int) duration);
         }
-        
-        loginLogMapper.update(null, updateWrapper);
+
+        this.update(null, updateWrapper);
         
         log.info("强制下线设备，userId: {}, loginLogId: {}, device: {}", 
                 userId, loginLogId, loginLog.getDeviceType());
@@ -181,8 +181,8 @@ public class LoginLogServiceImpl implements LoginLogService {
                 .eq(UserLoginLog::getLoginStatus, 0)  // 失败
                 .orderByDesc(UserLoginLog::getCreateTime)
                 .last("LIMIT " + count);
-        
-        return loginLogMapper.selectList(wrapper);
+
+        return this.list(wrapper);
     }
 
     @Override
@@ -192,8 +192,8 @@ public class LoginLogServiceImpl implements LoginLogService {
         
         LambdaQueryWrapper<UserLoginLog> wrapper = new LambdaQueryWrapper<>();
         wrapper.lt(UserLoginLog::getCreateTime, cutoffTime);
-        
-        int deletedCount = loginLogMapper.delete(wrapper);
+
+        int deletedCount = baseMapper.delete(wrapper);
         
         log.info("清理过期登录日志，保留天数: {}, 清理数量: {}", daysToKeep, deletedCount);
         

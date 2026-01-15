@@ -1,5 +1,6 @@
 package com.bytelab.tkline.server.service.core;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.bytelab.tkline.server.dto.security.GenerateKeyRequest;
 import com.bytelab.tkline.server.dto.security.KeyPairInfoDTO;
 import com.bytelab.tkline.server.dto.security.PublicKeyDTO;
@@ -10,7 +11,7 @@ import java.util.List;
 /**
  * 安全密钥管理服务接口
  */
-public interface SecurityService {
+public interface SecurityService extends IService<RsaKeyPair> {
 
     /**
      * 获取当前活跃的公钥

@@ -3,6 +3,7 @@ package com.bytelab.tkline.server.service.core.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.converter.UserConverter;
 import com.bytelab.tkline.server.dto.auth.TokenInfo;
 import com.bytelab.tkline.server.dto.user.*;
@@ -39,9 +40,8 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, SysUser> implements UserService {
 
-    private final UserMapper userMapper;
     private final UserConverter userConverter;
     private final JwtUtil jwtUtil;
     private final LoginLogService loginLogService;
@@ -55,14 +55,12 @@ public class UserServiceImpl implements UserService {
      * 循环依赖链路：UserCacheService -> UserServiceImpl -> UserCacheService
      */
     public UserServiceImpl(
-            UserMapper userMapper,
             UserConverter userConverter,
             JwtUtil jwtUtil,
             LoginLogService loginLogService,
             EmailService emailService,
             @Lazy UserCacheService userCacheService,
             TokenCacheService tokenCacheService) {
-        this.userMapper = userMapper;
         this.userConverter = userConverter;
         this.jwtUtil = jwtUtil;
         this.loginLogService = loginLogService;
@@ -84,7 +82,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<UserInfoDTO> getUserList(Integer page, Integer size) {
         Page<SysUser> pageParam = new Page<>(page, size);
-        IPage<SysUser> userPage = userMapper.selectPage(pageParam, null);
+        IPage<SysUser> userPage = this.page(pageParam, null);
 
         return userPage.getRecords().stream()
                 .map(userConverter::toUserInfoDTO)
@@ -93,7 +91,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserInfoDTO getUserById(Long id) {
-        SysUser sysUser = userMapper.selectById(id);
+        SysUser sysUser = this.getById(id);
         if (sysUser == null) {
             throw new BusinessException("用户不存在，ID: " + id);
         }
@@ -108,7 +106,7 @@ public class UserServiceImpl implements UserService {
         // 1. 检查用户名是否已存在
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, request.getUsername());
-        Long count = userMapper.selectCount(wrapper);
+        Long count = this.count(wrapper);
         if (count > 0) {
             throw new BusinessException("用户名已存在");
         }
@@ -123,7 +121,7 @@ public class UserServiceImpl implements UserService {
         sysUser.setStatus(1); // 默认启用
 
         // 3. 保存到数据库
-        userMapper.insert(sysUser);
+        this.save(sysUser);
 
         log.info("用户创建成功，ID: {}, username: {}", sysUser.getId(), sysUser.getUsername());
 
@@ -136,7 +134,7 @@ public class UserServiceImpl implements UserService {
         log.info("开始更新用户，ID: {}", request.getId());
 
         // 1. 查询用户
-        SysUser sysUser = userMapper.selectById(request.getId());
+        SysUser sysUser = this.getById(request.getId());
         if (sysUser == null) {
             throw new BusinessException("用户不存在，ID: " + request.getId());
         }
@@ -155,7 +153,7 @@ public class UserServiceImpl implements UserService {
         }
 
         // 4. 更新数据库
-        userMapper.updateById(sysUser);
+        this.updateById(sysUser);
 
         log.info("用户更新成功，ID: {}", sysUser.getId());
 
@@ -167,13 +165,13 @@ public class UserServiceImpl implements UserService {
     public boolean deleteUser(Long id) {
         log.info("开始删除用户，ID: {}", id);
 
-        SysUser sysUser = userMapper.selectById(id);
+        SysUser sysUser = this.getById(id);
         if (sysUser == null) {
             throw new BusinessException("用户不存在，ID: " + id);
         }
 
         // 逻辑删除
-        int deleted = userMapper.deleteById(id);
+        int deleted = baseMapper.deleteById(id);
 
         log.info("用户删除成功，ID: {}", id);
 
@@ -186,7 +184,7 @@ public class UserServiceImpl implements UserService {
         log.info("开始修改密码，userID: {}", request.getUserId());
 
         // 1. 查询用户
-        SysUser sysUser = userMapper.selectById(request.getUserId());
+        SysUser sysUser = this.getById(request.getUserId());
         if (sysUser == null) {
             throw new BusinessException("用户不存在，ID: " + request.getUserId());
         }
@@ -206,7 +204,7 @@ public class UserServiceImpl implements UserService {
         sysUser.setPassword(request.getNewPassword());
 
         // 5. 更新数据库
-        userMapper.updateById(sysUser);
+        this.updateById(sysUser);
 
         log.info("密码修改成功，userID: {}", request.getUserId());
 
@@ -218,7 +216,7 @@ public class UserServiceImpl implements UserService {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, username);
 
-        SysUser sysUser = userMapper.selectOne(wrapper);
+        SysUser sysUser = this.getOne(wrapper);
         if (sysUser == null) {
             throw new BusinessException("用户不存在，username: " + username);
         }
@@ -240,7 +238,7 @@ public class UserServiceImpl implements UserService {
         // 2. 查询用户
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, request.getUsername());
-        SysUser sysUser = userMapper.selectOne(wrapper);
+        SysUser sysUser = this.getOne(wrapper);
 
         if (sysUser == null) {
             log.warn("登录失败：用户不存在，username: {}", request.getUsername());
@@ -361,7 +359,7 @@ public class UserServiceImpl implements UserService {
         String username = jwtUtil.getUsernameFromToken(oldToken);
 
         // 2. 查询用户（验证用户是否仍然存在且未被禁用）
-        SysUser sysUser = userMapper.selectById(userId);
+        SysUser sysUser = this.getById(userId);
         if (sysUser == null) {
             throw new BusinessException("用户不存在");
         }
@@ -426,7 +424,7 @@ public class UserServiceImpl implements UserService {
         // 直接使用SQL查询用户名是否存在
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, username);
-        Long count = userMapper.selectCount(wrapper);
+        Long count = this.count(wrapper);
 
         boolean exists = count != null && count > 0;
         log.debug("用户名存在性检查，用户名：{}, 存在：{}", username, exists);
@@ -442,7 +440,7 @@ public class UserServiceImpl implements UserService {
         // 直接使用SQL查询邮箱是否存在（性能更优）
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getEmail, email);
-        Long count = userMapper.selectCount(wrapper);
+        Long count = this.count(wrapper);
 
         boolean exists = count != null && count > 0;
         log.debug("邮箱存在性检查，邮箱：{}, 存在：{}", email, exists);
@@ -479,7 +477,7 @@ public class UserServiceImpl implements UserService {
         // 3. 根据邮箱查询用户（直接SQL查询）
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getEmail, request.getEmail());
-        SysUser sysUser = userMapper.selectOne(wrapper);
+        SysUser sysUser = this.getOne(wrapper);
 
         if (sysUser == null) {
             // 记录失败日志
@@ -551,7 +549,7 @@ public class UserServiceImpl implements UserService {
         // 3. 根据邮箱查询用户
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getEmail, request.getEmail());
-        SysUser sysUser = userMapper.selectOne(wrapper);
+        SysUser sysUser = this.getOne(wrapper);
 
         if (sysUser == null) {
             log.warn("邮箱未注册，无法重置密码，邮箱：{}", request.getEmail());
@@ -571,7 +569,7 @@ public class UserServiceImpl implements UserService {
         sysUser.setPassword(request.getNewPassword());
 
         // 7. 更新数据库
-        userMapper.updateById(sysUser);
+        this.updateById(sysUser);
 
         // 8. 清除验证码
         emailService.clearCode(request.getEmail(), SendCodeRequest.CodePurpose.RESET_PASSWORD);
@@ -588,7 +586,7 @@ public class UserServiceImpl implements UserService {
         // 1. 验证邮箱是否已注册
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getEmail, email);
-        SysUser sysUser = userMapper.selectOne(wrapper);
+        SysUser sysUser = this.getOne(wrapper);
 
         if (sysUser == null) {
             throw new BusinessException("该邮箱未注册");
@@ -613,7 +611,7 @@ public class UserServiceImpl implements UserService {
         // 1. 检查用户名是否存在
         LambdaQueryWrapper<SysUser> usernameWrapper = new LambdaQueryWrapper<>();
         usernameWrapper.eq(SysUser::getUsername, request.getUsername());
-        SysUser sysUserByUsername = userMapper.selectOne(usernameWrapper);
+        SysUser sysUserByUsername = this.getOne(usernameWrapper);
 
         if (sysUserByUsername == null) {
             log.warn("用户名不存在：{}", request.getUsername());
@@ -627,7 +625,7 @@ public class UserServiceImpl implements UserService {
         // 2. 检查邮箱是否存在
         LambdaQueryWrapper<SysUser> emailWrapper = new LambdaQueryWrapper<>();
         emailWrapper.eq(SysUser::getEmail, request.getEmail());
-        SysUser sysUserByEmail = userMapper.selectOne(emailWrapper);
+        SysUser sysUserByEmail = this.getOne(emailWrapper);
 
         if (sysUserByEmail == null) {
             log.warn("邮箱不存在：{}", request.getEmail());
@@ -721,7 +719,7 @@ public class UserServiceImpl implements UserService {
         // 3. 查询用户
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getEmail, request.getEmail());
-        SysUser sysUser = userMapper.selectOne(wrapper);
+        SysUser sysUser = this.getOne(wrapper);
 
         if (sysUser == null) {
             log.warn("用户不存在，邮箱：{}", request.getEmail());
@@ -741,7 +739,7 @@ public class UserServiceImpl implements UserService {
         sysUser.setPassword(request.getNewPassword());
 
         // 7. 更新数据库
-        userMapper.updateById(sysUser);
+        this.updateById(sysUser);
 
         // 8. 清除Token（确保Token只能使用一次）
         emailService.clearResetToken(request.getEmail());
@@ -794,7 +792,7 @@ public class UserServiceImpl implements UserService {
         }
 
         // 2. 查询用户
-        SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+        SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, request.getUsername()));
 
         if (user == null) {
@@ -803,14 +801,14 @@ public class UserServiceImpl implements UserService {
 
         // 3. 更新角色
         user.setRole(request.getNewRole());
-        int rows = userMapper.updateById(user);
+        int rows = baseMapper.updateById(user);
 
         return rows > 0;
     }
 
     private String getInviterUsername(Long inviterId) {
         try {
-            SysUser inviter = userMapper.selectById(inviterId);
+            SysUser inviter = this.getById(inviterId);
             if (inviter != null) {
                 return inviter.getUsername();
             }

@@ -1,6 +1,7 @@
 package com.bytelab.tkline.server.service.user.impl;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.converter.ProfileConverter;
 import com.bytelab.tkline.server.dto.profile.ChangePasswordRequest;
 import com.bytelab.tkline.server.dto.profile.ProfileInfoDTO;
@@ -20,17 +21,16 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProfileServiceImpl implements ProfileService {
+public class ProfileServiceImpl extends ServiceImpl<UserMapper, SysUser> implements ProfileService {
 
-    private final UserMapper userMapper;
     private final ProfileConverter profileConverter;
 
     @Override
     public ProfileInfoDTO getProfileInfo(Long userId) {
         log.info("获取个人中心信息，用户ID：{}", userId);
-        
+
         // 获取用户信息
-        SysUser sysUser = userMapper.selectById(userId);
+        SysUser sysUser = this.getById(userId);
         if (sysUser == null || sysUser.getDeleted() == 1) {
             log.warn("用户不存在：{}", userId);
             throw new RuntimeException("用户不存在");
@@ -49,9 +49,9 @@ public class ProfileServiceImpl implements ProfileService {
     @Override
     public void changePassword(Long userId, ChangePasswordRequest request) {
         log.info("修改密码，用户ID：{}", userId);
-        
+
         // 获取用户信息
-        SysUser sysUser = userMapper.selectById(userId);
+        SysUser sysUser = this.getById(userId);
         if (sysUser == null || sysUser.getDeleted() == 1) {
             log.warn("用户不存在：{}", userId);
             throw new RuntimeException("用户不存在");
@@ -67,8 +67,8 @@ public class ProfileServiceImpl implements ProfileService {
                 .eq(SysUser::getId, userId)
                 .set(SysUser::getUpdateTime, LocalDateTime.now());
         // .set(User::getPassword, passwordEncoder.encode(request.getNewPassword()));
-        
-        int result = userMapper.update(null, updateWrapper);
+
+        int result = baseMapper.update(null, updateWrapper);
         if (result > 0) {
             log.info("修改密码成功，用户ID：{}", userId);
         } else {
@@ -82,7 +82,7 @@ public class ProfileServiceImpl implements ProfileService {
         log.info("重置订阅，用户ID：{}", userId);
 
         // 获取用户信息
-        SysUser sysUser = userMapper.selectById(userId);
+        SysUser sysUser = this.getById(userId);
         if (sysUser == null || sysUser.getDeleted() == 1) {
             log.warn("用户不存在：{}", userId);
             throw new RuntimeException("用户不存在");

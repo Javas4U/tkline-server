@@ -1,13 +1,15 @@
 package com.bytelab.tkline.server.service.core;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.bytelab.tkline.server.dto.user.*;
+import com.bytelab.tkline.server.entity.SysUser;
 
 import java.util.List;
 
 /**
  * 用户服务接口
  */
-public interface UserService {
+public interface UserService extends IService<SysUser> {
     
     /**
      * 获取用户列表（分页）

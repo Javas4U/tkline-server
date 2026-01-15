@@ -1,6 +1,7 @@
 package com.bytelab.tkline.server.service.core.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.converter.SecurityConverter;
 import com.bytelab.tkline.server.dto.security.GenerateKeyRequest;
 import com.bytelab.tkline.server.dto.security.PublicKeyDTO;
@@ -8,6 +9,7 @@ import com.bytelab.tkline.server.entity.RsaKeyPair;
 import com.bytelab.tkline.server.mapper.RsaKeyPairMapper;
 import com.bytelab.tkline.server.service.core.SecurityService;
 import com.bytelab.tkline.server.util.RsaKeyUtil;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,10 +24,12 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SecurityServiceImpl implements SecurityService {
+public class SecurityServiceImpl extends ServiceImpl<RsaKeyPairMapper, RsaKeyPair> implements SecurityService {
 
-    private final RsaKeyPairMapper rsaKeyPairMapper;
     private final SecurityConverter securityConverter;
+
+    @Resource
+    private RsaKeyPairMapper rsaKeyPairMapper;
 
     @Override
     public PublicKeyDTO getActivePublicKey() {
@@ -34,7 +38,7 @@ public class SecurityServiceImpl implements SecurityService {
                 .orderByDesc(RsaKeyPair::getCreateTime)
                 .last("LIMIT 1");
 
-        RsaKeyPair activeKey = rsaKeyPairMapper.selectOne(wrapper);
+        RsaKeyPair activeKey = this.getOne(wrapper);
         
         // 情况1: 没有活跃密钥，自动生成
         if (activeKey == null) {
@@ -45,10 +49,10 @@ public class SecurityServiceImpl implements SecurityService {
         else if (isKeyExpired(activeKey)) {
             log.warn("当前活跃密钥已过期，keyId: {}, expireTime: {}, 开始自动轮换...", 
                     activeKey.getKeyId(), activeKey.getExpireTime());
-            
+
             // 将过期密钥设置为非活跃
             activeKey.setIsActive(0);
-            rsaKeyPairMapper.updateById(activeKey);
+            this.updateById(activeKey);
             
             // 生成新的活跃密钥
             activeKey = generateAndActivateDefaultKey("自动轮换生成的密钥（旧密钥已过期）");
@@ -108,7 +112,7 @@ public class SecurityServiceImpl implements SecurityService {
         }
 
         // 保存密钥对
-        rsaKeyPairMapper.insert(rsaKeyPair);
+        this.save(rsaKeyPair);
 
         log.info("成功生成密钥对，keyId: {}, version: {}, isActive: {}",
                 rsaKeyPair.getKeyId(), rsaKeyPair.getVersion(), rsaKeyPair.getIsActive());
@@ -155,7 +159,7 @@ public class SecurityServiceImpl implements SecurityService {
                 .orderByDesc(RsaKeyPair::getVersion)
                 .last("LIMIT 1");
 
-        RsaKeyPair latestKey = rsaKeyPairMapper.selectOne(wrapper);
+        RsaKeyPair latestKey = this.getOne(wrapper);
         return latestKey != null ? latestKey.getVersion() + 1 : 1;
     }
 
@@ -164,7 +168,7 @@ public class SecurityServiceImpl implements SecurityService {
         // 查询密钥对
         LambdaQueryWrapper<RsaKeyPair> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(RsaKeyPair::getKeyId, keyId);
-        RsaKeyPair keyPair = rsaKeyPairMapper.selectOne(wrapper);
+        RsaKeyPair keyPair = this.getOne(wrapper);
 
         if (keyPair == null) {
             throw new RuntimeException("未找到指定的密钥，keyId: " + keyId);

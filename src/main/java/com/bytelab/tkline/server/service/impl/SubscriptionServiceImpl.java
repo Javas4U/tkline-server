@@ -3,6 +3,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.converter.SubscriptionConverter;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
@@ -38,9 +39,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SubscriptionServiceImpl implements SubscriptionService {
+public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Subscription> implements SubscriptionService {
 
-    private final SubscriptionMapper subscriptionMapper;
     private final SubscriptionConverter subscriptionConverter;
     private final NodeSubscriptionRelationService nodeSubscriptionRelationService;
     private final NodeSubscriptionRelationMapper nodeSubscriptionRelationMapper;
@@ -50,7 +50,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Transactional(rollbackFor = Exception.class)
     public Long createSubscription(SubscriptionCreateDTO createDTO) {
         // 1. 检查名称是否存在
-        boolean exists = subscriptionMapper.exists(new LambdaQueryWrapper<Subscription>()
+        boolean exists = this.exists(new LambdaQueryWrapper<Subscription>()
                 .eq(Subscription::getGroupName, createDTO.getGroupName()));
         if (exists) {
             throw new BusinessException("订阅组名称已存在: " + createDTO.getGroupName());
@@ -66,7 +66,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             subscription.setOrderNo(SubscriptionOrderGenerator.generateOrderNo());
         }
 
-        subscriptionMapper.insert(subscription);
+        this.save(subscription);
         log.info("Subscription created: id={}, groupName={}, orderNo={}",
                 subscription.getId(), subscription.getGroupName(), subscription.getOrderNo());
 
@@ -75,7 +75,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     public SubscriptionDTO getSubscriptionDetail(Long id) {
-        Subscription subscription = subscriptionMapper.selectById(id);
+        Subscription subscription = this.getById(id);
         if (subscription == null) {
             throw new BusinessException("订阅不存在: " + id);
         }
@@ -98,8 +98,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
         wrapper.orderByDesc(Subscription::getId);
 
-        IPage<Subscription> result = subscriptionMapper.selectPage(page,
-                wrapper);
+        IPage<Subscription> result = this.page(page, wrapper);
 
         // 转换为DTO并计算节点数
         IPage<SubscriptionDTO> dtoPage = result.convert(subscription -> {
@@ -133,14 +132,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         Page<NodeDTO> page = new Page<>(query.getPage(), query.getPageSize());
 
         // 执行查询 - 直接返回包含绑定配置的 NodeDTO,支持名称和区域查询
-        return subscriptionMapper.selectNodesBySubscriptionId(page, subscriptionId, query.getName(), query.getRegion());
+        return baseMapper.selectNodesBySubscriptionId(page, subscriptionId, query.getName(), query.getRegion());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateSubscription(SubscriptionUpdateDTO updateDTO) {
         // 1. 检查是否存在
-        Subscription existing = subscriptionMapper.selectById(updateDTO.getId());
+        Subscription existing = this.getById(updateDTO.getId());
         if (existing == null) {
             throw new BusinessException("订阅不存在: " + updateDTO.getId());
         }
@@ -149,8 +148,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         subscriptionConverter.updateEntityFromDto(updateDTO, existing);
         existing.setUpdateBy("admin"); // TODO: current user
 
-        int rows = subscriptionMapper.updateById(existing);
-        if (rows == 0) {
+        boolean success = this.updateById(existing);
+        if (!success) {
             throw new BusinessException("更新失败，可能已被其他用户修改");
         }
 
@@ -222,7 +221,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Override
     public String getSubscriptionConfigUrl(Long subscriptionId, java.util.List<Long> nodeIds, String baseUrl) {
         // 获取订阅信息
-        Subscription subscription = subscriptionMapper.selectById(subscriptionId);
+        Subscription subscription = this.getById(subscriptionId);
         if (subscription == null) {
             throw new BusinessException("订阅不存在: " + subscriptionId);
         }
@@ -257,7 +256,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         log.info("生成YAML配置: orderNo={}, nodeIds={}", orderNo, nodeIds);
 
         // 1. 查询订阅信息
-        Subscription subscription = subscriptionMapper.selectOne(
+        Subscription subscription = this.getOne(
                 new LambdaQueryWrapper<Subscription>()
                         .eq(Subscription::getOrderNo, orderNo));
 
@@ -281,7 +280,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         log.info("生成JSON配置: orderNo={}, nodeIds={}", orderNo, nodeIdList);
 
         // 1. 查询订阅信息
-        Subscription subscription = subscriptionMapper.selectOne(
+        Subscription subscription = this.getOne(
                 new LambdaQueryWrapper<Subscription>()
                         .eq(Subscription::getOrderNo, orderNo));
 
@@ -305,7 +304,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         log.info("生成Base64配置: orderNo={}, nodeIds={}", orderNo, nodeIdList);
 
         // 1. 查询订阅信息
-        Subscription subscription = subscriptionMapper.selectOne(
+        Subscription subscription = this.getOne(
                 new LambdaQueryWrapper<Subscription>()
                         .eq(Subscription::getOrderNo, orderNo));
 
@@ -330,25 +329,69 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     /**
-     * 构建节点URI (hysteria2/vless)
+     * 构建节点URI (hysteria2/vless/trojan)
+     * 根据节点的 protocols 字段动态生成 URI
      */
     private String buildNodeUri(Subscription subscription, Node node) {
         String name = node.getName();
-        // 订单号本身就是 UUID 格式，直接使用
         String uuid = subscription.getOrderNo();
+        StringBuilder uris = new StringBuilder();
 
-        // 简单模拟节点类型判断，实际业务中 node 表可能需要 protocol 字段
-        // 这里基于 port 或名称简单区分，或者根据需求同时返回两种协议
-        if (node.getPort() == 443) {
-            // VLESS+Reality
-            return String.format(
-                    "vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=YOUR_REALITY_PUBLIC_KEY&sid=a1b2c3d4#%s",
-                    uuid, node.getIpAddress(), node.getPort(), name);
-        } else {
-            // Hysteria2 - 使用 UUID 作为 password
-            return String.format(
-                    "hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==#%s",
-                    uuid, node.getIpAddress(), node.getPort(), node.getIpAddress(), name);
+        // 优先使用 protocols 字段
+        if (StringUtils.isNotBlank(node.getProtocols())) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<List<String>>() {});
+
+                for (String proto : protos) {
+                    int port = getProtocolPort(proto, node.getPort());
+                    String uri = buildProtocolUri(proto, uuid, node, port, name);
+                    if (uri != null) {
+                        uris.append(uri).append("\n");
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse protocols for node '{}': {}", node.getName(), node.getProtocols(), e);
+            }
+        }
+
+        return uris.toString().trim();
+    }
+
+    /**
+     * 根据协议类型构建 URI
+     */
+    private String buildProtocolUri(String protocol, String uuid, Node node, int port, String name) {
+        String protoLower = protocol.toLowerCase();
+        String nodeName = name + "-" + protocol.toUpperCase();
+
+        switch (protoLower) {
+            case "hy2":
+            case "hysteria2":
+                // Hysteria2: hysteria2://password@host:port/?params
+                return String.format(
+                        "hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==#%s",
+                        uuid, node.getIpAddress(), port, node.getIpAddress(), nodeName);
+
+            case "vless":
+            case "reality":
+                // VLESS+Reality: vless://uuid@host:port?params
+                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
+                        ? node.getRealityPublicKey()
+                        : "YOUR_REALITY_PUBLIC_KEY";
+                return String.format(
+                        "vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=a1b2c3d4#%s",
+                        uuid, node.getIpAddress(), port, publicKey, nodeName);
+
+            case "trojan":
+                // Trojan: trojan://password@host:port?params
+                return String.format(
+                        "trojan://%s@%s:%d?sni=%s&allowInsecure=0#%s",
+                        uuid, node.getIpAddress(), port, node.getIpAddress(), nodeName);
+
+            default:
+                log.warn("Unknown protocol '{}' for node '{}'", protocol, node.getName());
+                return null;
         }
     }
 

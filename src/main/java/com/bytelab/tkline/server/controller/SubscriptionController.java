@@ -1,5 +1,6 @@
 package com.bytelab.tkline.server.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bytelab.tkline.server.common.ApiResult;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
@@ -9,6 +10,7 @@ import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionUpdateDTO;
+import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.service.SubscriptionService;
 import com.bytelab.tkline.server.service.util.QRCodeService;
 import com.bytelab.tkline.server.util.HttpUtil;
@@ -211,8 +213,10 @@ public class SubscriptionController {
         try {
             String config;
             String contentType;
-            String filename;
             boolean isBrowser = isBrowser(userAgent);
+
+            Subscription subscription = this.subscriptionService.getOne(new LambdaQueryWrapper<Subscription>().eq(Subscription::getOrderNo, orderNo));
+            String filename = subscription.getGroupName();
 
             // 使用 HttpUtil 动态获取 baseUrl,支持反向代理
             String baseUrl = HttpUtil.getBaseUrl(request);
@@ -236,29 +240,29 @@ public class SubscriptionController {
                 // Clash 客户端或强制 YAML
                 config = subscriptionService.generateYamlConfig(orderNo, nodeIdList, baseUrl);
                 contentType = "text/yaml";
-                filename = "subscription_" + orderNo + ".yaml";
+                filename = filename + ".yaml";
             } else if ("json".equalsIgnoreCase(format) || "karing".equalsIgnoreCase(clientType)
                     || "sing-box".equalsIgnoreCase(clientType)) {
                 // Karing/Sing-Box 客户端或强制 JSON
                 config = subscriptionService.generateJsonConfig(orderNo, nodeIdList, baseUrl);
                 contentType = "application/json";
-                filename = "subscription_" + orderNo + ".json";
+                filename = filename + ".json";
             } else if ("base64".equalsIgnoreCase(format) || "v2ray".equalsIgnoreCase(clientType)
                     || "shadowsocks".equalsIgnoreCase(clientType) || "shadowrocket".equalsIgnoreCase(clientType)) {
                 // V2Ray/Shadowsocks/Shadowrocket 客户端或强制 Base64
                 config = subscriptionService.generateBase64Config(orderNo, nodeIdList, baseUrl);
                 contentType = "text/plain";
-                filename = "subscription_" + orderNo + ".txt";
+                filename = filename + ".txt";
             } else if (isBrowser) {
                 // 浏览器访问默认返回 JSON (便于查看)
                 config = subscriptionService.generateJsonConfig(orderNo, nodeIdList, baseUrl);
                 contentType = "application/json";
-                filename = "subscription_" + orderNo + ".json";
+                filename = filename + ".json";
             } else {
                 // 其他未知客户端默认返回 Base64 (兼容性最好)
                 config = subscriptionService.generateBase64Config(orderNo, nodeIdList, baseUrl);
                 contentType = "text/plain";
-                filename = "subscription_" + orderNo + ".txt";
+                filename = filename + ".txt";
             }
 
             log.info("订阅配置生成成功: orderNo={}, nodeCount={}, contentType={}, configSize={}",

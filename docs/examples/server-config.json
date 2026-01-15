@@ -8,6 +8,12 @@
             {
                 "tag": "google",
                 "address": "8.8.8.8",
+                "address_resolver": "local",
+                "detour": "direct"
+            },
+            {
+                "tag": "local",
+                "address": "local",
                 "detour": "direct"
             },
             {
@@ -17,15 +23,20 @@
         ],
         "rules": [
             {
-                "outbound": "any",
+                "query_type": [
+                    "A",
+                    "AAAA"
+                ],
                 "server": "dns-fake"
             }
         ],
         "fakeip": {
             "enabled": true,
-            "inet4_range": "198.18.0.1/16"
+            "inet4_range": "198.18.0.0/15",
+            "inet6_range": "fc00::/18"
         },
-        "strategy": "ipv4_only"
+        "strategy": "ipv4_only",
+        "independent_cache": true
     },
     "inbounds": [
         {
@@ -48,8 +59,8 @@
             },
             "users": [
                 {
-                    "name": "hunter",
-                    "password": "SUB20251208506820093413"
+                    "name": "tkline-admin",
+                    "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015"
                 }
             ]
         },
@@ -60,9 +71,9 @@
             "listen_port": 10443,
             "users": [
                 {
-                    "uuid": "52a7d83e-9a51-41d4-a58e-4d987cb4a018",
+                    "uuid": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
                     "password": "c7921ebd04d93a67a18fd82c98e2c774",
-                    "name": "user_12345"
+                    "name": "tkline-admin"
                 }
             ],
             "tls": {
@@ -81,8 +92,8 @@
             "listen_port": 9443,
             "users": [
                 {
-                    "password": "SUB20251208506820093413",
-                    "name": "user_12345"
+                    "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
+                    "name": "tkline-admin"
                 }
             ],
             "tls": {
@@ -102,9 +113,9 @@
             "listen_port": 8443,
             "users": [
                 {
-                    "uuid": "9f92a3e3-90ad-4fc4-82bf-9e7b6abceeef",
+                    "uuid": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
                     "flow": "xtls-rprx-vision",
-                    "name": "user_12345"
+                    "name": "tkline-admin"
                 }
             ],
             "tls": {
@@ -116,7 +127,7 @@
                         "server": "www.cloudflare.com",
                         "server_port": 443
                     },
-                    "private_key": "sCWnFiLHYIWEt0Jsy_n75kUGIj4F5gYeeDI50UaZ0GY",
+                    "private_key": "WM-4qNwANi5NelqN9JhuR1fBByFwZ6My4h43FmHpZ3M",
                     "short_id": [
                         "a1b2c3d4"
                     ]
@@ -148,7 +159,8 @@
                 "action": "reject"
             }
         ],
-        "auto_detect_interface": true
+        "auto_detect_interface": true,
+        "default_domain_resolver": "google"
     },
     "outbounds": [
         {

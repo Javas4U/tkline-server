@@ -1,5 +1,6 @@
 package com.bytelab.tkline.server.service.user;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.bytelab.tkline.server.entity.UserLoginLog;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -8,7 +9,7 @@ import java.util.List;
 /**
  * 登录日志服务接口
  */
-public interface LoginLogService {
+public interface LoginLogService extends IService<UserLoginLog> {
     
     /**
      * 记录登录成功日志

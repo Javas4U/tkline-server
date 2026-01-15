@@ -1,14 +1,16 @@
 package com.bytelab.tkline.server.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
 import com.bytelab.tkline.server.dto.relation.RelationBindDTO;
+import com.bytelab.tkline.server.entity.NodeSubscriptionRelation;
 
 import java.util.List;
 
 /**
  * 节点订阅关联服务接口
  */
-public interface NodeSubscriptionRelationService {
+public interface NodeSubscriptionRelationService extends IService<NodeSubscriptionRelation> {
 
     /**
      * 绑定节点和订阅

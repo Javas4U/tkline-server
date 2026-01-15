@@ -1,12 +1,14 @@
 package com.bytelab.tkline.server.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
+import com.bytelab.tkline.server.entity.Subscription;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -14,7 +16,7 @@ import java.util.List;
 /**
  * 订阅服务接口
  */
-public interface SubscriptionService {
+public interface SubscriptionService extends IService<Subscription> {
 
     /**
      * 创建订阅
