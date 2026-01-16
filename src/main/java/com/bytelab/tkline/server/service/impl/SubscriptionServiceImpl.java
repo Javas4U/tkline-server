@@ -369,9 +369,20 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
             case "hy2":
             case "hysteria2":
                 // Hysteria2: hysteria2://password@host:port/?params
-                return String.format(
-                        "hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==#%s",
-                        uuid, node.getIpAddress(), port, node.getIpAddress(), nodeName);
+                StringBuilder hy2Uri = new StringBuilder();
+                hy2Uri.append(String.format("hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==",
+                        uuid, node.getIpAddress(), port, node.getIpAddress()));
+
+                // 添加上行和下行带宽配置
+                if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
+                    hy2Uri.append("&up_mbps=").append(node.getUpstreamQuota());
+                }
+                if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
+                    hy2Uri.append("&down_mbps=").append(node.getDownstreamQuota());
+                }
+
+                hy2Uri.append("#").append(nodeName);
+                return hy2Uri.toString();
 
             case "vless":
             case "reality":
@@ -380,7 +391,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                         ? node.getRealityPublicKey()
                         : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
                 return String.format(
-                        "vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=a1b2c3d4#%s",
+                        "vless://%s@%s:%d?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=a1b2c3d4#%s",
                         uuid, node.getIpAddress(), port, publicKey, nodeName);
 
             case "trojan":
@@ -515,7 +526,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                                 proxiesBuilder.append("    network: tcp\n");
                                 proxiesBuilder.append("    tls: true\n");
                                 proxiesBuilder.append("    udp: true\n");
-                                proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                                // proxiesBuilder.append("    flow: xtls-rprx-vision\n");
                                 proxiesBuilder.append("    servername: www.cloudflare.com\n");
                                 proxiesBuilder.append("    reality-opts:\n");
                                 // 使用数据库中保存的 Reality 公钥
@@ -562,7 +573,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                     proxiesBuilder.append("    network: tcp\n");
                     proxiesBuilder.append("    tls: true\n");
                     proxiesBuilder.append("    udp: true\n");
-                    proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                    // proxiesBuilder.append("    flow: xtls-rprx-vision\n");
                     proxiesBuilder.append("    servername: www.cloudflare.com\n");
                     proxiesBuilder.append("    reality-opts:\n");
                     // 使用数据库中保存的 Reality 公钥
@@ -714,7 +725,7 @@ rules:
                                 outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
                                 outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
                                 outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n"); // 客户端身份认证凭证
-                                outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                                // outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
                                 outboundsBuilder.append("            \"tls\": {\n");
                                 outboundsBuilder.append("                \"enabled\": true,\n");
                                 outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n"); // 服务器域名 告诉服务器要伪装成哪个网站
@@ -775,7 +786,7 @@ rules:
                     outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
                     outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
                     outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n");
-                    outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                    // outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
                     outboundsBuilder.append("            \"tls\": {\n");
                     outboundsBuilder.append("                \"enabled\": true,\n");
                     outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n");

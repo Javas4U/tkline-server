@@ -3,25 +3,52 @@
         "level": "info",
         "timestamp": true
     },
+    "experimental": {
+        "cache_file": {
+            "enabled": true,
+            "path": "/var/lib/sing-box/cache.db",
+            "store_fakeip": true
+        },
+        "clash_api": {
+            "external_controller": "0.0.0.0:9090",
+            "secret": "5fcd85da-f3c5-4444-b497-ea759cef4248"
+        }
+    },
     "dns": {
         "servers": [
             {
                 "tag": "google",
-                "address": "8.8.8.8",
-                "address_resolver": "local",
+                "address": "tls://8.8.8.8",
                 "detour": "direct"
             },
             {
-                "tag": "local",
-                "address": "local",
+                "tag": "cloudflare",
+                "address": "tls://1.1.1.1",
                 "detour": "direct"
             },
             {
                 "tag": "dns-fake",
-                "address": "fakeip"
+                "address": "fakeip",
+                "strategy": "ipv4_only"
             }
         ],
         "rules": [
+            {
+                "rule_set": [
+                    "geosite-tiktok",
+                    "geosite-youtube",
+                    "geosite-google",
+                    "geosite-instagram",
+                    "geosite-facebook",
+                    "geosite-twitter",
+                    "geosite-netflix",
+                    "geosite-openai",
+                    "geosite-telegram",
+                    "geosite-spotify",
+                    "geosite-github"
+                ],
+                "server": "cloudflare"
+            },
             {
                 "query_type": [
                     "A",
@@ -32,10 +59,8 @@
         ],
         "fakeip": {
             "enabled": true,
-            "inet4_range": "198.18.0.0/15",
-            "inet6_range": "fc00::/18"
+            "inet4_range": "198.18.0.0/15"
         },
-        "strategy": "ipv4_only",
         "independent_cache": true
     },
     "inbounds": [
@@ -45,6 +70,8 @@
             "listen": "::",
             "listen_port": 443,
             "ignore_client_bandwidth": true,
+            "tcp_fast_open": true,
+            "tcp_multi_path": false,
             "obfs": {
                 "type": "salamander",
                 "password": "NTdhMjdhMjAwMjRkYWEzYg=="
@@ -69,9 +96,11 @@
             "tag": "tuic-in",
             "listen": "::",
             "listen_port": 10443,
+            "tcp_fast_open": true,
+            "tcp_multi_path": false,
             "users": [
                 {
-                    "uuid": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
+                    "uuid": "52a7d83e-9a51-41d4-a58e-4d987cb4a018",
                     "password": "c7921ebd04d93a67a18fd82c98e2c774",
                     "name": "tkline-admin"
                 }
@@ -90,6 +119,8 @@
             "tag": "trojan-in",
             "listen": "::",
             "listen_port": 9443,
+            "tcp_fast_open": true,
+            "tcp_multi_path": false,
             "users": [
                 {
                     "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
@@ -111,10 +142,11 @@
             "tag": "vless-in",
             "listen": "::",
             "listen_port": 8443,
+            "tcp_fast_open": true,
+            "tcp_multi_path": false,
             "users": [
                 {
                     "uuid": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
-                    "flow": "xtls-rprx-vision",
                     "name": "tkline-admin"
                 }
             ],
@@ -127,16 +159,94 @@
                         "server": "www.cloudflare.com",
                         "server_port": 443
                     },
-                    "private_key": "WM-4qNwANi5NelqN9JhuR1fBByFwZ6My4h43FmHpZ3M",
+                    "private_key": "4Aqo5poVknmQ1e68gqq4n6V07BLnCy56KNa6LkHnz1A",
                     "short_id": [
                         "a1b2c3d4"
-                    ]
+                    ],
+                    "max_time_difference": "1m"
                 }
             }
         }
     ],
     "route": {
         "rule_set": [
+            {
+                "tag": "geosite-tiktok",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-tiktok.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-youtube",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-google",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-instagram",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-instagram.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-facebook",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-facebook.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-twitter",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-twitter.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-netflix",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-openai",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-telegram",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-spotify",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-spotify.srs",
+                "download_detour": "direct"
+            },
+            {
+                "tag": "geosite-github",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-github.srs",
+                "download_detour": "direct"
+            },
             {
                 "tag": "geosite-category-ads-all",
                 "type": "remote",
@@ -151,15 +261,64 @@
                 "action": "hijack-dns"
             },
             {
-                "ip_is_private": true,
-                "action": "reject"
+                "protocol": "quic",
+                "outbound": "direct"
+            },
+            {
+                "network": "udp",
+                "port": 443,
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-tiktok",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-youtube",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-google",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-instagram",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-facebook",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-twitter",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-netflix",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-openai",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-telegram",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-spotify",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-github",
+                "outbound": "direct"
             },
             {
                 "rule_set": "geosite-category-ads-all",
                 "action": "reject"
             }
         ],
-        "auto_detect_interface": true,
+        "auto_detect_interface": false,
         "default_domain_resolver": "google"
     },
     "outbounds": [
@@ -167,12 +326,5 @@
             "type": "direct",
             "tag": "direct"
         }
-    ],
-    "experimental": {
-        "cache_file": {
-            "enabled": true,
-            "path": "/var/lib/sing-box/cache.db",
-            "store_fakeip": true
-        }
-    }
+    ]
 }
