@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.bytelab.tkline.server.config.RealityConfig;
 import com.bytelab.tkline.server.converter.SubscriptionConverter;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
@@ -45,6 +46,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
     private final NodeSubscriptionRelationService nodeSubscriptionRelationService;
     private final NodeSubscriptionRelationMapper nodeSubscriptionRelationMapper;
     private final NodeMapper nodeMapper;
+    private final RealityConfig realityConfig;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -387,12 +389,11 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
             case "vless":
             case "reality":
                 // VLESS+Reality: vless://uuid@host:port?params
-                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                        ? node.getRealityPublicKey()
-                        : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
+                String publicKey = realityConfig.getPublicKey();
+                String shortId = realityConfig.getShortId();
                 return String.format(
-                        "vless://%s@%s:%d?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=a1b2c3d4#%s",
-                        uuid, node.getIpAddress(), port, publicKey, nodeName);
+                        "vless://%s@%s:%d?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=%s#%s",
+                        uuid, node.getIpAddress(), port, publicKey, shortId, nodeName);
 
             case "trojan":
                 // Trojan: trojan://password@host:port?params
@@ -529,12 +530,9 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                                 // proxiesBuilder.append("    flow: xtls-rprx-vision\n");
                                 proxiesBuilder.append("    servername: www.cloudflare.com\n");
                                 proxiesBuilder.append("    reality-opts:\n");
-                                // 使用数据库中保存的 Reality 公钥
-                                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                                    ? node.getRealityPublicKey()
-                                    : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
-                                proxiesBuilder.append("      public-key: ").append(publicKey).append("\n");
-                                proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                                // 使用配置中的 Reality 公钥
+                                proxiesBuilder.append("      public-key: ").append(realityConfig.getPublicKey()).append("\n");
+                                proxiesBuilder.append("      short-id: ").append(realityConfig.getShortId()).append("\n");
                                 proxiesBuilder.append("    client-fingerprint: chrome\n");
                                 generated = true;
                             } else if ("trojan".equalsIgnoreCase(proto)) {
@@ -576,12 +574,9 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                     // proxiesBuilder.append("    flow: xtls-rprx-vision\n");
                     proxiesBuilder.append("    servername: www.cloudflare.com\n");
                     proxiesBuilder.append("    reality-opts:\n");
-                    // 使用数据库中保存的 Reality 公钥
-                    String legacyPublicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                        ? node.getRealityPublicKey()
-                        : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
-                    proxiesBuilder.append("      public-key: ").append(legacyPublicKey).append("\n");
-                    proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                    // 使用配置中的 Reality 公钥
+                    proxiesBuilder.append("      public-key: ").append(realityConfig.getPublicKey()).append("\n");
+                    proxiesBuilder.append("      short-id: ").append(realityConfig.getShortId()).append("\n");
                     proxiesBuilder.append("    client-fingerprint: chrome\n");
                 } else {
                     // Hysteria2 (legacy) - 使用 UUID 作为 password
@@ -735,12 +730,9 @@ rules:
                                 outboundsBuilder.append("                },\n");
                                 outboundsBuilder.append("                \"reality\": {\n");
                                 outboundsBuilder.append("                    \"enabled\": true,\n");
-                                // 使用数据库中保存的 Reality 公钥
-                                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                                    ? node.getRealityPublicKey()
-                                    : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
-                                outboundsBuilder.append("                    \"public_key\": \"").append(publicKey).append("\",\n");
-                                outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                                // 使用配置中的 Reality 公钥
+                                outboundsBuilder.append("                    \"public_key\": \"").append(realityConfig.getPublicKey()).append("\",\n");
+                                outboundsBuilder.append("                    \"short_id\": \"").append(realityConfig.getShortId()).append("\"\n");
                                 outboundsBuilder.append("                }\n");
                                 outboundsBuilder.append("            }\n");
                                 outboundsBuilder.append("        },\n");
@@ -796,8 +788,8 @@ rules:
                     outboundsBuilder.append("                },\n");
                     outboundsBuilder.append("                \"reality\": {\n");
                     outboundsBuilder.append("                    \"enabled\": true,\n");
-                    outboundsBuilder.append("                    \"public_key\": \"").append(node.getRealityPublicKey()).append("\",\n");
-                    outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                    outboundsBuilder.append("                    \"public_key\": \"").append(realityConfig.getPublicKey()).append("\",\n");
+                    outboundsBuilder.append("                    \"short_id\": \"").append(realityConfig.getShortId()).append("\"\n");
                     outboundsBuilder.append("                }\n");
                     outboundsBuilder.append("            }\n");
                     outboundsBuilder.append("        },\n");

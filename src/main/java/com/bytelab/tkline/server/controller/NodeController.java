@@ -12,6 +12,7 @@ import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.service.NodeService;
 import io.swagger.v3.oas.annotations.Operation;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -77,5 +78,25 @@ public class NodeController {
     public ApiResult<IPage<SubscriptionDTO>> pageNodeSubscriptions(
             @RequestParam Long nodeId, @RequestBody PageQueryDTO query) {
         return ApiResult.success(nodeService.pageNodeSubscriptions(nodeId, query));
+    }
+
+    /**
+     * 下载节点配置文件
+     * 根据server-config.json模板生成配置文件，并根据订阅组绑定关系填充users配置项
+     */
+    @GetMapping("/downloadConfig/{id}")
+    @Operation(summary = "下载节点配置文件")
+    public void downloadNodeConfig(@PathVariable Long id, HttpServletResponse response) {
+        nodeService.downloadNodeConfig(id, response);
+    }
+
+    /**
+     * 下载节点 Docker Compose 配置文件
+     * 根据 docker-compose.yaml 模板生成部署配置文件
+     */
+    @GetMapping("/downloadDockerComposeConfig/{id}")
+    @Operation(summary = "下载节点 Docker Compose 配置文件")
+    public void downloadNodeDockerComposeConfig(@PathVariable Long id, HttpServletResponse response) {
+        nodeService.downloadNodeDockerComposeConfig(id, response);
     }
 }

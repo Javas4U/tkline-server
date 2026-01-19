@@ -136,3 +136,12 @@ cache:
     max-size: 50000      # 最多缓存token数
     cleanup-cron: "0 0 * * * ?"  # 每小时清理过期token
     blacklist-cleanup-cron: "0 0 3 * * ?"  # 每天凌晨3点清理黑名单
+
+# Reality 协议配置
+reality:
+  # Reality 公钥（用于客户端配置）
+  public-key: ${REALITY_PUBLIC_KEY:Rv6ciZx97Yu5hu8573QqD1HGcRo-YBrl7T8tW-yEf2s}
+  # Reality 私钥（用于服务端配置，请勿公开）
+  private-key: ${REALITY_PRIVATE_KEY:sBBzieowhwXQDjR2LA3DEfYVOVBBc8rhl_pfAXRomU8}
+  # Reality Short ID
+  short-id: ${REALITY_SHORT_ID:a1b2c3d4}

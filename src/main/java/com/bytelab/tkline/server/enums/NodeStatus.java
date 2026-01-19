@@ -7,8 +7,8 @@ import lombok.Getter;
  * 节点状态枚举
  * <p>
  * 状态说明：
- * - DISABLED: 禁用状态（不可用于新的订阅绑定）
- * - ENABLED: 启用状态（正常可用）
+ * - OFFLINE: 离线状态（节点不可用）
+ * - ONLINE: 在线状态（节点正常可用）
  * <p>
  * 创建日期：2026-01-07
  * 功能分支：014-node-subscription
@@ -20,14 +20,14 @@ import lombok.Getter;
 public enum NodeStatus {
 
     /**
-     * 禁用状态
+     * 离线状态
      */
-    DISABLED(0, "禁用"),
+    OFFLINE(0, "离线"),
 
     /**
-     * 启用状态
+     * 在线状态
      */
-    ENABLED(1, "启用");
+    ONLINE(1, "在线");
 
     /**
      * 状态编码
@@ -78,11 +78,11 @@ public enum NodeStatus {
     }
 
     /**
-     * 判断节点是否启用
+     * 判断节点是否在线
      *
-     * @return true表示启用
+     * @return true表示在线
      */
-    public boolean isEnabled() {
-        return this == ENABLED;
+    public boolean isOnline() {
+        return this == ONLINE;
     }
 }

@@ -36,4 +36,6 @@ public class NodeUpdateDTO {
     @Min(value = 0, message = "下行配额不能为负数")
     private Integer downstreamQuota;
 
+    private Boolean online;
+
 }

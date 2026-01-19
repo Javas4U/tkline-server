@@ -32,12 +32,6 @@ public class Node {
     @TableField("protocols")
     private String protocols;
 
-    @TableField("reality_public_key")
-    private String realityPublicKey;
-
-    @TableField("reality_private_key")
-    private String realityPrivateKey;
-
     @TableField("upstream_quota")
     private Integer upstreamQuota;
 

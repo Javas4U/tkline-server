@@ -19,12 +19,6 @@ public class NodeDTO {
     @Schema(description = "支持的协议列表，如 [\"hy2\",\"vmess\",\"trojan\"]")
     private String protocols;
 
-    @Schema(description = "Reality 协议公钥")
-    private String realityPublicKey;
-
-    @Schema(description = "Reality 协议私钥")
-    private String realityPrivateKey;
-
     @Schema(description = "上行配额(Mbps)")
     private Integer upstreamQuota;
 
