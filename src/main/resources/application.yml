@@ -1,0 +1,138 @@
+# 服务器配置
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: tkline-server
+
+  # 彩色日志输出
+  output:
+    ansi:
+      enabled: always
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+      enabled: true
+
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 支持通过环境变量配置数据库连接
+    url: jdbc:mysql://${DB_HOST:1.94.145.5}:${DB_PORT:3306}/${DB_NAME:tkline}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:hunter123@bytelab.com}
+
+  # 热部署配置
+  devtools:
+    restart:
+      enabled: true
+      exclude: static/**,public/**,templates/**
+      additional-paths: src/main/java
+    livereload:
+      enabled: true
+
+  # 邮箱配置
+  mail:
+    host: ${MAIL_HOST:smtpdm.aliyun.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:noreply@mail.bytelab.com.cn}
+    password: ${MAIL_PASSWORD:k8W3xR9pL2qT7mN4}
+    protocol: ${MAIL_PROTOCOL:smtp}
+    properties:
+      mail:
+        smtp:
+          replyto: ${MAIL_REPLYTO:bytelab@126.com}
+          auth: true
+          starttls:
+            enable: true
+          socketFactory:
+            port: 465
+            class: javax.net.ssl.SSLSocketFactory
+    default-encoding: UTF-8
+
+  # 缓存配置（使用简单内存缓存）
+  cache:
+    type: simple
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.bytelab.tkline.server.entity
+  global-config:
+    banner: true
+    db-config:
+      id-type: ASSIGN_ID
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# SpringDoc 配置
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:true}
+    path: /swagger-ui.html
+    persist-authorization: true
+    display-request-duration: true
+    operations-sorter: alpha
+    tags-sorter: alpha
+    doc-expansion: none
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.bytelab.tkline.server
+
+# Actuator 配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      base-path: /actuator
+  endpoint:
+    health:
+      enabled: true
+      show-details: when-authorized
+  health:
+    defaults:
+      enabled: true
+
+# 日志配置
+logging:
+  level:
+    com.bytelab.tkline: ${LOG_LEVEL_APP:debug}
+    com.baomidou.mybatisplus: ${LOG_LEVEL_MYBATIS:debug}
+
+# JWT配置
+jwt:
+  # JWT签名密钥（开发环境默认值，生产环境必须通过环境变量JWT_SECRET覆盖）
+  secret: ${JWT_SECRET:25ce66ee090fc4e2d272289dc1a2e54d692cfbd35bbf96e60b2c308b3a0b2a15f7d7f38051ccff27038d5fc397dd09badc2c4ce52d089867c957cfbaa94c475e}
+  expiration: 1800  # Token过期时间（秒），默认30分钟
+
+# 安全配置
+security:
+  max-devices: 5    # 单用户最多同时登录设备数
+  max-login-attempts: 5  # 最大登录失败次数
+  lock-duration-minutes: 15  # 账号锁定时长（分钟）
+
+# 缓存配置
+cache:
+  # 用户信息缓存
+  user:
+    max-size: 10000      # 最多缓存用户数
+    expire-hours: 24     # 24小时未访问自动清除
+  # Token缓存
+  token:
+    max-size: 50000      # 最多缓存token数
+    cleanup-cron: "0 0 * * * ?"  # 每小时清理过期token
+    blacklist-cleanup-cron: "0 0 3 * * ?"  # 每天凌晨3点清理黑名单

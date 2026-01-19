@@ -1,0 +1,175 @@
+{
+    "outbounds": [
+      {
+        "tag": "美国-洛杉矶-VLESS",
+        "type": "vless",
+        "server": "apexlos.bytelab.com.cn",
+        "server_port": 8443,
+        "uuid": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
+        "flow": "xtls-rprx-vision",
+        "tls": {
+          "enabled": true,
+          "server_name": "www.cloudflare.com",
+          "utls": {
+            "enabled": true,
+            "fingerprint": "chrome"
+          },
+          "reality": {
+            "enabled": true,
+            "public_key": "gHho/NpQBENanKX1lTb9MQPpb7ClNC/Vv6DH3THfij4=",
+            "short_id": "a1b2c3d4"
+          }
+        }
+      },
+      {
+        "tag": "美国-洛杉矶-HY2",
+        "type": "hysteria2",
+        "server": "apexlos.bytelab.com.cn",
+        "server_port": 443,
+        "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
+        "up_mbps": 150,
+        "down_mbps": 150,
+        "obfs": {
+          "type": "salamander",
+          "password": "NTdhMjdhMjAwMjRkYWEzYg=="
+        },
+        "tls": {
+          "enabled": true,
+          "server_name": "apexlos.bytelab.com.cn",
+          "alpn": [
+            "h3"
+          ]
+        }
+      },
+      {
+        "tag": "美国-洛杉矶-TROJAN",
+        "type": "trojan",
+        "server": "apexlos.bytelab.com.cn",
+        "server_port": 9443,
+        "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
+        "tls": {
+          "enabled": true,
+          "server_name": "apexlos.bytelab.com.cn",
+          "alpn": [
+            "h2",
+            "http/1.1"
+          ]
+        }
+      },
+      {
+        "type": "direct",
+        "tag": "direct"
+      },
+      {
+        "type": "dns",
+        "tag": "dns-out"
+      },
+      {
+        "type": "block",
+        "tag": "block"
+      }
+    ],
+    "dns": {
+      "servers": [
+        {
+          "tag": "google",
+          "address": "https://8.8.8.8/dns-query",
+          "address_resolver": "local"
+        },
+        {
+          "tag": "cloudflare",
+          "address": "https://1.1.1.1/dns-query",
+          "address_resolver": "local"
+        },
+        {
+          "tag": "local",
+          "address": "223.5.5.5",
+          "detour": "direct"
+        },
+        {
+          "tag": "block",
+          "address": "rcode://success"
+        }
+      ],
+      "rules": [
+        {
+          "outbound": "any",
+          "server": "local"
+        },
+        {
+          "rule_set": "geosite-category-ads-all",
+          "server": "block"
+        },
+        {
+          "rule_set": "geosite-cn",
+          "server": "local"
+        },
+        {
+          "clash_mode": "direct",
+          "server": "local"
+        },
+        {
+          "clash_mode": "global",
+          "server": "google"
+        }
+      ],
+      "final": "google",
+      "strategy": "prefer_ipv4"
+    },
+    "route": {
+      "auto_detect_interface": true,
+      "final": "美国-洛杉矶-VLESS",
+      "rule_set": [
+        {
+          "tag": "geosite-cn",
+          "type": "remote",
+          "format": "binary",
+          "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+          "download_detour": "direct"
+        },
+        {
+          "tag": "geoip-cn",
+          "type": "remote",
+          "format": "binary",
+          "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+          "download_detour": "direct"
+        },
+        {
+          "tag": "geosite-category-ads-all",
+          "type": "remote",
+          "format": "binary",
+          "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+          "download_detour": "direct"
+        }
+      ],
+      "rules": [
+        {
+          "protocol": "dns",
+          "outbound": "dns-out"
+        },
+        {
+          "rule_set": "geosite-category-ads-all",
+          "outbound": "block"
+        },
+        {
+          "ip_is_private": true,
+          "outbound": "direct"
+        },
+        {
+          "clash_mode": "direct",
+          "outbound": "direct"
+        },
+        {
+          "clash_mode": "global",
+          "outbound": "美国-洛杉矶-VLESS"
+        },
+        {
+          "rule_set": [
+            "geoip-cn",
+            "geosite-cn"
+          ],
+          "outbound": "direct"
+        }
+      ]
+    }
+  }

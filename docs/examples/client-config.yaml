@@ -1,0 +1,61 @@
+# Clash Meta 配置文件模板
+# 订阅组:测试订阅003
+# 订阅编号:3a7ca20a-4e92-408c-af5b-8a69abbd0015
+
+proxies:
+  - name: "中国-香港-VLESS"
+    type: vless
+    server: apexhk1.bytelab.com.cn
+    port: 8443
+    uuid: 3a7ca20a-4e92-408c-af5b-8a69abbd0015
+    network: tcp
+    tls: true
+    udp: true
+    flow: xtls-rprx-vision
+    servername: www.cloudflare.com
+    reality-opts:
+      public-key: qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU
+      short-id: a1b2c3d4
+    client-fingerprint: chrome
+  - name: "中国-香港-HY2"
+    type: hysteria2
+    server: apexhk1.bytelab.com.cn
+    port: 443
+    password: 3a7ca20a-4e92-408c-af5b-8a69abbd0015
+    up: 50
+    down: 50
+    sni: apexhk1.bytelab.com.cn
+    skip-cert-verify: false
+    obfs: salamander
+    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==
+  - name: "中国-香港-TROJAN"
+    type: trojan
+    server: apexhk1.bytelab.com.cn
+    port: 9443
+    password: 3a7ca20a-4e92-408c-af5b-8a69abbd0015
+    sni: apexhk1.bytelab.com.cn
+    skip-cert-verify: false
+    udp: true
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - "中国-香港-VLESS"
+      - "中国-香港-HY2"
+      - "中国-香港-TROJAN"
+      - DIRECT
+
+rules:
+  # 局域网直连
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+  # 中国大陆流量直连
+  - GEOIP,CN,DIRECT
+  - GEOSITE,CN,DIRECT
+  # 其他流量走代理
+  - MATCH,PROXY

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bytelab.tkline.server.mapper.NodeSubscriptionRelationMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO node_subscription_relation (
+            node_id, subscription_id, valid_from, valid_to, traffic_limit, traffic_used, status, create_time, create_by, deleted
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.nodeId}, #{item.subscriptionId}, #{item.validFrom}, #{item.validTo}, #{item.trafficLimit},
+             #{item.trafficUsed}, #{item.status}, #{item.createTime}, #{item.createBy}, #{item.deleted})
+        </foreach>
+    </insert>
+
+    <update id="deleteBatch">
+        UPDATE node_subscription_relation
+        SET deleted = 1
+        WHERE id IN
+        <foreach collection="idList" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

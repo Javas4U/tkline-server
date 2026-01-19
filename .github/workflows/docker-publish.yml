@@ -1,0 +1,112 @@
+name: Docker Image CI/CD to Aliyun ACR
+
+on:
+  push:
+    branches:
+      - main
+      - '[0-9]+.*'  # 匹配所有版本分支: 0.1.0, 0.4.0, 1.0.0, 2.3.4 等
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - '[0-9]+.*'
+  workflow_dispatch:
+
+env:
+  # 阿里云容器镜像服务 ACR 配置
+  REGISTRY: ${{ secrets.ACR_REGISTRY }}
+  IMAGE_NAME: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/tkline-server
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          # 启用 buildkit 镜像存储,加快构建速度
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+          # 启用更激进的 BuildKit 优化参数
+          buildkitd-flags: --allow-insecure-entitlement network.host --allow-insecure-entitlement security.insecure
+
+      - name: 登录到阿里云容器镜像服务 ACR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: 提取 Docker 元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # 每次提交都打上唯一的 commit SHA tag(短格式7位)
+            type=sha,prefix={{branch}}-,format=short
+            # 分支名作为"最新版本"指针,会被后续提交覆盖(这是预期行为)
+            type=ref,event=branch
+            # 始终打上 latest tag,指向最新构建的镜像
+            type=raw,value=latest
+          flavor: |
+            latest=false
+
+      - name: 记录构建开始时间
+        id: build-start
+        run: echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: 构建并推送 Docker 镜像
+        id: docker-build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 🚀 性能优化:只构建 amd64,arm64 按需构建
+          platforms: linux/amd64
+          # 启用内联缓存
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          # 启用并行构建
+          provenance: false
+          sbom: false
+          # 优化缓存策略 - 使用 GitHub Actions 缓存
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 计算构建耗时并输出镜像信息
+        run: |
+          # 计算构建耗时
+          BUILD_START=${{ steps.build-start.outputs.timestamp }}
+          BUILD_END=$(date +%s)
+          BUILD_DURATION=$((BUILD_END - BUILD_START))
+          BUILD_MINUTES=$((BUILD_DURATION / 60))
+          BUILD_SECONDS=$((BUILD_DURATION % 60))
+
+          echo "### Docker 镜像构建成功 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**构建耗时:** ${BUILD_MINUTES}分${BUILD_SECONDS}秒 (总计 ${BUILD_DURATION}秒)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**镜像标签:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**构建平台:** linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**镜像摘要:** ${{ steps.docker-build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**阿里云 ACR 仓库:** ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/tkline-server" >> $GITHUB_STEP_SUMMARY

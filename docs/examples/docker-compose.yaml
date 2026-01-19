@@ -1,0 +1,15 @@
+services:
+  singbox:
+    image: ghcr.io/sagernet/sing-box:latest
+    container_name: singbox
+    restart: always
+    network_mode: host
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /root/projects/sing-box/config.json:/etc/sing-box/config.json
+      - /etc/letsencrypt/live/apexhk1.bytelab.com.cn:/etc/sing-box/cert:ro
+      - /root/projects/sing-box:/var/lib/sing-box
+    command: run -c /etc/sing-box/config.json
+          
+networks: {}
