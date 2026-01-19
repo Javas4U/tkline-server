@@ -1002,7 +1002,7 @@ rules:
         // 标准协议端口映射（与服务端配置一致）
         return switch (protocol.toLowerCase()) {
             case "vless", "reality" -> 8443;      // VLESS+Reality 使用 8443
-            case "hy2", "hysteria2" -> 443;       // Hysteria2 使用 443
+            case "hy2", "hysteria2" -> 7443;       // Hysteria2 使用 7443
             case "trojan" -> 9443;                // Trojan 使用 9443
             case "tuic" -> 10443;                 // TUIC 使用 10443
             default -> {
