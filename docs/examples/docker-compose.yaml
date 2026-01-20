@@ -6,6 +6,7 @@ services:
     network_mode: host
     volumes:
       - /root/projects/sing-box/config.json:/etc/sing-box/config.json
+      - /root/projects/sing-box:/var/lib/sing-box
       - /etc/letsencrypt/live/lostest.bytelab.com.cn:/etc/sing-box/cert:ro
     command: run -c /etc/sing-box/config.json
 

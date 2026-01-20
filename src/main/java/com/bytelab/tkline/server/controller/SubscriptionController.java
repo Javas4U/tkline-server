@@ -99,7 +99,7 @@ public class SubscriptionController {
         String clientIp = HttpUtil.getClientIp(request);
         log.info("获取订阅用户列表请求: clientIp={}, page={}, pageSize={}", clientIp, page, pageSize);
 
-        IPage<ProxyUserDTO> result = subscriptionService.getProxyUsersByNodeIp("45.207.211.3", page, pageSize);
+        IPage<ProxyUserDTO> result = subscriptionService.getProxyUsersByNodeIp(clientIp, page, pageSize);
         return ApiResult.success(result);
     }
 
