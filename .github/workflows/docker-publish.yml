@@ -53,8 +53,6 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            # 每次提交都打上唯一的 commit SHA tag(短格式7位)
-            type=sha,prefix={{branch}}-,format=short
             # 分支名作为"最新版本"指针,会被后续提交覆盖(这是预期行为)
             type=ref,event=branch
             # 始终打上 latest tag,指向最新构建的镜像
