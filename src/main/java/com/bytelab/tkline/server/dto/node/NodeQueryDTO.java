@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class NodeQueryDTO extends PageQueryDTO {
     private String name;
+    private String domain;
     private String ipAddress;
     private String region;
     private Integer status;

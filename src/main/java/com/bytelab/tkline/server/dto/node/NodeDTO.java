@@ -9,6 +9,7 @@ import lombok.Data;
 public class NodeDTO {
     private Long id;
     private String name;
+    private String domain;
     private String ipAddress;
     private Integer port;
     private String region;

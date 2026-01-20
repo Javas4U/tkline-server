@@ -12,6 +12,7 @@ import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.service.NodeService;
 import io.swagger.v3.oas.annotations.Operation;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -96,7 +97,7 @@ public class NodeController {
      */
     @GetMapping("/downloadDockerComposeConfig/{id}")
     @Operation(summary = "下载节点 Docker Compose 配置文件")
-    public void downloadNodeDockerComposeConfig(@PathVariable Long id, HttpServletResponse response) {
-        nodeService.downloadNodeDockerComposeConfig(id, response);
+    public void downloadNodeDockerComposeConfig(@PathVariable Long id, HttpServletRequest request, HttpServletResponse response) {
+        nodeService.downloadNodeDockerComposeConfig(id, request, response);
     }
 }

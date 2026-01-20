@@ -1,4 +1,5 @@
 package com.bytelab.tkline.server.service.impl;
+import com.bytelab.tkline.server.dto.subscription.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -9,10 +10,6 @@ import com.bytelab.tkline.server.converter.SubscriptionConverter;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionUpdateDTO;
 import com.bytelab.tkline.server.entity.Node;
 import com.bytelab.tkline.server.entity.NodeSubscriptionRelation;
 import com.bytelab.tkline.server.entity.Subscription;
@@ -1030,5 +1027,145 @@ rules:
             log.error("加载模板失败: {}", templateName, e);
             throw new BusinessException("加载配置模板失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public IPage<ProxyUserDTO> getProxyUsersByNodeIp(String nodeIp, Integer page, Integer pageSize) {
+        log.info("根据节点IP获取代理用户列表: nodeIp={}, page={}, pageSize={}", nodeIp, page, pageSize);
+
+        // 创建分页对象
+        Page<ProxyUserDTO> resultPage = new Page<>(page, pageSize);
+
+        // 1. 根据IP地址查询节点
+        List<Node> nodes = nodeMapper.selectList(
+                new LambdaQueryWrapper<Node>()
+                        .eq(Node::getIpAddress, nodeIp)
+                        .eq(Node::getDeleted, 0)
+        );
+
+        if (nodes.isEmpty()) {
+            log.warn("未找到IP地址为 {} 的节点", nodeIp);
+            return resultPage;
+        }
+
+        // 2. 获取所有节点ID
+        List<Long> nodeIds = nodes.stream()
+                .map(Node::getId)
+                .collect(Collectors.toList());
+
+        log.info("找到 {} 个节点: {}", nodes.size(), nodeIds);
+
+        // 3. 查询这些节点的有效订阅关系(分页,排除过期订阅)
+        Page<NodeSubscriptionRelation> relationPage = new Page<>(page, pageSize);
+        LambdaQueryWrapper<NodeSubscriptionRelation> wrapper = new LambdaQueryWrapper<NodeSubscriptionRelation>()
+                .in(NodeSubscriptionRelation::getNodeId, nodeIds)
+                .eq(NodeSubscriptionRelation::getStatus, 1) // 状态为1表示有效
+                .and(w -> w.isNull(NodeSubscriptionRelation::getValidTo) // valid_to为NULL视为永久有效
+                        .or()
+                        .gt(NodeSubscriptionRelation::getValidTo, java.time.LocalDateTime.now())) // 或者有效期未过期
+                .orderByDesc(NodeSubscriptionRelation::getCreateTime);
+
+        log.debug("查询订阅关系 - 节点IDs: {}, 当前时间: {}", nodeIds, java.time.LocalDateTime.now());
+        nodeSubscriptionRelationMapper.selectPage(relationPage, wrapper);
+
+        if (relationPage.getRecords().isEmpty()) {
+            log.warn("该节点没有有效的订阅关联关系 - 尝试查询所有关联关系以便调试");
+            // 调试：查询该节点的所有订阅关系（不考虑有效期）
+            List<NodeSubscriptionRelation> allRelations = nodeSubscriptionRelationMapper.selectList(
+                    new LambdaQueryWrapper<NodeSubscriptionRelation>()
+                            .in(NodeSubscriptionRelation::getNodeId, nodeIds)
+            );
+            log.info("该节点总共有 {} 条订阅关系记录", allRelations.size());
+            for (NodeSubscriptionRelation rel : allRelations) {
+                log.info("订阅关系详情 - ID: {}, subscriptionId: {}, status: {}, validFrom: {}, validTo: {}, deleted: {}",
+                        rel.getId(), rel.getSubscriptionId(), rel.getStatus(),
+                        rel.getValidFrom(), rel.getValidTo(), rel.getDeleted());
+            }
+            return resultPage;
+        }
+
+        log.info("找到 {} 条有效订阅关系", relationPage.getRecords().size());
+
+        // 4. 获取关联的订阅信息
+        Set<Long> subscriptionIds = relationPage.getRecords().stream()
+                .map(NodeSubscriptionRelation::getSubscriptionId)
+                .collect(Collectors.toSet());
+
+        // 批量查询订阅
+        Map<Long, Subscription> subscriptionMap = this.listByIds(subscriptionIds).stream()
+                .collect(Collectors.toMap(Subscription::getId, s -> s));
+
+        // 创建节点Map以便查询协议
+        Map<Long, Node> nodeMap = nodes.stream()
+                .collect(Collectors.toMap(Node::getId, n -> n));
+
+        // 5. 构建代理用户列表
+        List<ProxyUserDTO> proxyUsers = new ArrayList<>();
+
+        for (NodeSubscriptionRelation relation : relationPage.getRecords()) {
+            Subscription subscription = subscriptionMap.get(relation.getSubscriptionId());
+            Node node = nodeMap.get(relation.getNodeId());
+
+            if (subscription == null || node == null) {
+                log.warn("订阅或节点不存在: subscriptionId={}, nodeId={}",
+                        relation.getSubscriptionId(), relation.getNodeId());
+                continue;
+            }
+
+            // 解析节点支持的协议列表
+            String protocols = node.getProtocols();
+            if (StringUtils.isBlank(protocols)) {
+                log.warn("节点 {} 没有配置协议", node.getId());
+                continue;
+            }
+
+            // 尝试解析JSON格式的协议列表
+            List<String> protocolList = new ArrayList<>();
+            try {
+                // 首先尝试JSON数组格式 ["vless", "hy2"]
+                ObjectMapper mapper = new ObjectMapper();
+                protocolList = mapper.readValue(protocols, new TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                // 如果JSON解析失败,尝试逗号分隔格式
+                String[] protocolArray = protocols.split(",");
+                for (String protocol : protocolArray) {
+                    String trimmed = protocol.trim();
+                    if (!trimmed.isEmpty()) {
+                        protocolList.add(trimmed);
+                    }
+                }
+            }
+
+            if (protocolList.isEmpty()) {
+                log.warn("节点 {} 的协议列表为空", node.getId());
+                continue;
+            }
+
+            // 为每个协议创建一条代理用户记录,使用subscription表的order_no
+            for (String protocol : protocolList) {
+                String trimmedProtocol = protocol.trim().toLowerCase();
+                if (StringUtils.isBlank(trimmedProtocol)) {
+                    continue;
+                }
+
+                ProxyUserDTO proxyUser = new ProxyUserDTO();
+                proxyUser.setName(subscription.getGroupName());
+                proxyUser.setUuid(subscription.getOrderNo()); // 从subscription表获取
+                proxyUser.setPassword(subscription.getOrderNo()); // 从subscription表获取
+                proxyUser.setProtocol(trimmedProtocol);
+
+                proxyUsers.add(proxyUser);
+            }
+        }
+
+        // 6. 设置分页信息
+        resultPage.setRecords(proxyUsers);
+        resultPage.setTotal(relationPage.getTotal() * (proxyUsers.isEmpty() ? 1 : proxyUsers.size() / Math.max(relationPage.getRecords().size(), 1)));
+        resultPage.setCurrent(page);
+        resultPage.setSize(pageSize);
+
+        log.info("成功获取节点 {} 的代理用户列表: 总关系数={}, 返回用户数={}", nodeIp, relationPage.getTotal(), proxyUsers.size());
+
+        return resultPage;
     }
 }

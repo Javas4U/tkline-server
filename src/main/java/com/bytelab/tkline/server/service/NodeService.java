@@ -7,6 +7,7 @@ import com.bytelab.tkline.server.dto.node.*;
 
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.entity.Node;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
@@ -71,7 +72,8 @@ public interface NodeService extends IService<Node> {
      * 根据 docker-compose.yaml 模板生成部署配置文件
      *
      * @param nodeId   节点ID
+     * @param request  HTTP请求
      * @param response HTTP响应
      */
-    void downloadNodeDockerComposeConfig(Long nodeId, HttpServletResponse response);
+    void downloadNodeDockerComposeConfig(Long nodeId, HttpServletRequest request, HttpServletResponse response);
 }

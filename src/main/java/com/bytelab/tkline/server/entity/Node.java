@@ -14,6 +14,9 @@ public class Node {
     @TableField("name")
     private String name;
 
+    @TableField("domain")
+    private String domain;
+
     @TableField("ip_address")
     private String ipAddress;
 

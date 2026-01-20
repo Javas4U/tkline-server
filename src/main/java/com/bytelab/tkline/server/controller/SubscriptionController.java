@@ -10,6 +10,7 @@ import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionUpdateDTO;
+import com.bytelab.tkline.server.dto.subscription.ProxyUserDTO;
 import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.service.SubscriptionService;
 import com.bytelab.tkline.server.service.util.QRCodeService;
@@ -79,6 +80,27 @@ public class SubscriptionController {
     @GetMapping("/getSubscriptionNodeIds/{id}")
     public ApiResult<java.util.List<Long>> getSubscriptionNodeIds(@PathVariable Long id) {
         return ApiResult.success(subscriptionService.getSubscriptionNodeIds(id));
+    }
+
+    /**
+     * 获取订阅用户信息(用于配置更新器)
+     * <p>
+     * 根据请求方IP地址查询该节点订阅的用户信息,排除过期订阅
+     * 返回有效订阅的用户信息,包含 name(group_name), uuid/password(orderNo), protocol
+     */
+    @GetMapping("/users")
+    @Operation(summary = "获取订阅用户列表", description = "根据请求IP获取该节点的订阅用户信息,用于配置更新器同步用户")
+    public ApiResult<IPage<ProxyUserDTO>> getSubscriptionUsers(
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "1000") Integer pageSize,
+            HttpServletRequest request) {
+
+        // 获取请求方IP地址
+        String clientIp = HttpUtil.getClientIp(request);
+        log.info("获取订阅用户列表请求: clientIp={}, page={}, pageSize={}", clientIp, page, pageSize);
+
+        IPage<ProxyUserDTO> result = subscriptionService.getProxyUsersByNodeIp("45.207.211.3", page, pageSize);
+        return ApiResult.success(result);
     }
 
     /**

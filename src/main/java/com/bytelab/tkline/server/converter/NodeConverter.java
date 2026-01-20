@@ -30,6 +30,7 @@ public interface NodeConverter {
     @Mapping(target = "lastHeartbeatTime", ignore = true)
     Node toEntity(NodeCreateDTO dto);
 
+    @Mapping(target = "status", ignore = true) // 状态由业务逻辑单独处理
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     @Mapping(target = "createBy", ignore = true)

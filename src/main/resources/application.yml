@@ -145,3 +145,9 @@ reality:
   private-key: ${REALITY_PRIVATE_KEY:sBBzieowhwXQDjR2LA3DEfYVOVBBc8rhl_pfAXRomU8}
   # Reality Short ID
   short-id: ${REALITY_SHORT_ID:a1b2c3d4}
+
+# API服务密钥（从配置文件读取，用于验证外部服务身份，如 singbox-config-updater）
+# API_SERVICE_SECRET (生成命令：openssl rand -base64 32)
+api:
+  service:
+    secret: ${API_SERVICE_SECRET:wjTMOWKEzXJFTQUG7MLMPt7pOQ3qRMXRZVQowrKxvHg=}

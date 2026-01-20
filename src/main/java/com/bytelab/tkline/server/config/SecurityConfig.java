@@ -25,7 +25,7 @@ import java.util.Arrays;
  * 1. 配置 SecurityFilterChain，定义哪些路径需要认证
  * 2. 禁用不需要的默认特性（formLogin、httpBasic、CSRF）
  * 3. 配置无状态Session管理（STATELESS）
- * 4. 注册JWT认证过滤器到过滤器链
+ * 4. 注册JWT认证过滤器到过滤器链（支持JWT和API Key两种认证方式）
  * <p>
  * 公开路径白名单：
  * - /api/health - 健康检查（用于Docker健康检查）
@@ -46,7 +46,11 @@ import java.util.Arrays;
  * - /api/admin/categories/** - 分类管理（开发阶段临时开放）
  * - /uploads/** - 上传文件访问（公开，用于教程图片等静态资源）
  * <p>
+ * API Key 认证路径（在 JwtAuthenticationFilter 中处理）：
+ * - /api/subscription/users - 获取订阅用户信息（需要 API Key）
+ * <p>
  * 创建日期：2025-11-02
+ * 更新日期：2025-01-20（合并API Key认证到JWT过滤器）
  *
  * @author Apex Tunnel Team
  * @see com.bytelab.tkline.server.filter.JwtAuthenticationFilter
@@ -124,6 +128,9 @@ public class SecurityConfig {
                         // 节点心跳接口(公开,供节点上报状态)
                         .requestMatchers("/api/v1/node/heartbeat").permitAll()
 
+                        // API Key 保护的接口(在 JwtAuthenticationFilter 中验证 API Key)
+                        .requestMatchers("/api/subscription/users").permitAll()
+
                         // Swagger文档(开发环境,生产环境建议禁用)
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
 
@@ -131,6 +138,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
 
                 // 注册JWT认证过滤器（在UsernamePasswordAuthenticationFilter之前执行）
+                // 该过滤器同时支持 JWT Token 和 API Key 两种认证方式
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // 配置异常处理：认证失败返回401而不是403
@@ -152,7 +160,7 @@ public class SecurityConfig {
                             response.getWriter().write("{\"code\":403,\"message\":\"权限不足，无法访问此资源\"}");
                         }));
 
-        log.info("Spring Security SecurityFilterChain 配置完成，JWT认证过滤器已注册");
+        log.info("Spring Security SecurityFilterChain 配置完成，JWT认证过滤器已注册（支持JWT和API Key两种认证方式）");
         return http.build();
     }
 

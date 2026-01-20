@@ -4,12 +4,25 @@ services:
     container_name: singbox
     restart: always
     network_mode: host
-    environment:
-      - TZ=Asia/Shanghai
     volumes:
       - /root/projects/sing-box/config.json:/etc/sing-box/config.json
-      - /etc/letsencrypt/live/{{DOMAIN}}:/etc/sing-box/cert:ro
-      - /root/projects/sing-box:/var/lib/sing-box
+      - /etc/letsencrypt/live/lostest.bytelab.com.cn:/etc/sing-box/cert:ro
     command: run -c /etc/sing-box/config.json
 
-networks: {}
+  config-updater:
+    build: .
+    container_name: singbox-config-updater
+    restart: always
+    environment:
+      - API_BASE_URL=${API_BASE_URL}
+      - API_KEY=${API_KEY}
+      - SINGBOX_CONFIG_PATH=/etc/sing-box/config.json
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-*/5 * * * *}
+      - RESTART_SINGBOX=${RESTART_SINGBOX:-true}
+      - SINGBOX_CONTAINER_NAME=singbox
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - /root/projects/sing-box/:/etc/sing-box/
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - singbox

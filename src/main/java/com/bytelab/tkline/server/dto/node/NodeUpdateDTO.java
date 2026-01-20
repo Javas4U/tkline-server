@@ -12,7 +12,10 @@ public class NodeUpdateDTO {
     @Size(max = 100, message = "节点名称长度不能超过100")
     private String name;
 
-    @NotBlank(message = "IP地址不能为空")
+    @NotBlank(message = "域名不能为空")
+    @Size(max = 255, message = "域名长度不能超过255")
+    private String domain;
+
     @Size(max = 45, message = "IP地址长度不能超过45")
     private String ipAddress;
 

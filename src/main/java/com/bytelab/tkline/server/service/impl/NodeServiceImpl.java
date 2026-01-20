@@ -21,11 +21,13 @@ import com.bytelab.tkline.server.exception.BusinessException;
 import com.bytelab.tkline.server.mapper.NodeMapper;
 import com.bytelab.tkline.server.mapper.NodeSubscriptionRelationMapper;
 import com.bytelab.tkline.server.service.NodeService;
+import com.bytelab.tkline.server.util.HttpUtil;
 import com.bytelab.tkline.server.util.RealityKeyUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
@@ -38,6 +40,7 @@ import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +62,9 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     private final ObjectMapper objectMapper;
 
     private final RealityConfig realityConfig;
+
+    @Value("${api.service.secret}")
+    private String apiServiceSecret;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -101,6 +107,9 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         if (query.getName() != null && !query.getName().isEmpty()) {
             wrapper.like(Node::getName, query.getName());
         }
+        if (query.getDomain() != null && !query.getDomain().isEmpty()) {
+            wrapper.like(Node::getDomain, query.getDomain());
+        }
         if (query.getIpAddress() != null && !query.getIpAddress().isEmpty()) {
             wrapper.eq(Node::getIpAddress, query.getIpAddress());
         }
@@ -139,6 +148,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
 
         // 更新基本字段
         updateWrapper.set(Node::getName, updateDTO.getName())
+                .set(Node::getDomain, updateDTO.getDomain())
                 .set(Node::getIpAddress, updateDTO.getIpAddress())
                 .set(Node::getPort, updateDTO.getPort())
                 .set(Node::getRegion, updateDTO.getRegion())
@@ -259,7 +269,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     }
 
     @Override
-    public void downloadNodeDockerComposeConfig(Long nodeId, HttpServletResponse response) {
+    public void downloadNodeDockerComposeConfig(Long nodeId, HttpServletRequest request, HttpServletResponse response) {
         try {
             // 1. 获取节点信息
             Node node = this.getById(nodeId);
@@ -274,10 +284,16 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
                 template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
             }
 
-            // 3. 替换模板中的占位符
+            // 3. 使用 HttpUtil 动态获取 baseUrl，支持反向代理
+            String apiBaseUrl = HttpUtil.getBaseUrl(request);
+            log.debug("Docker Compose 配置 API baseUrl: {}", apiBaseUrl);
+
+            // 4. 替换模板中的占位符
             String dockerComposeContent = template
                 .replace("{{NODE_NAME}}", node.getName())
-                .replace("{{DOMAIN}}", node.getIpAddress());
+                .replace("{{DOMAIN}}", node.getDomain() != null ? node.getDomain() : node.getIpAddress())
+                .replace("${API_BASE_URL}", apiBaseUrl)
+                .replace("${API_KEY}", apiServiceSecret);
 
             // 4. 设置响应头
             response.setContentType("text/yaml");
