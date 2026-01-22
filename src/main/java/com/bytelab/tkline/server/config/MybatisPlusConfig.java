@@ -1,9 +1,11 @@
 package com.bytelab.tkline.server.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.bytelab.tkline.server.handler.AuditMetaObjectHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -31,5 +33,14 @@ public class MybatisPlusConfig {
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
 
         return interceptor;
+    }
+
+    /**
+     * 自动填充处理器
+     * 显式注册以确保审计字段能够被自动填充
+     */
+    @Bean
+    public MetaObjectHandler metaObjectHandler() {
+        return new AuditMetaObjectHandler();
     }
 }

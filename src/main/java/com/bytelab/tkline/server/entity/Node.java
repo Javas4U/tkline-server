@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("node")
-public class Node {
+public class Node extends BaseEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
@@ -41,22 +41,6 @@ public class Node {
     @TableField("downstream_quota")
     private Integer downstreamQuota;
 
-    @TableField("create_time")
-    private LocalDateTime createTime;
-
-    @TableField("update_time")
-    private LocalDateTime updateTime;
-
-    @TableField("create_by")
-    private String createBy;
-
-    @TableField("update_by")
-    private String updateBy;
-
     @TableField("last_heartbeat_time")
     private LocalDateTime lastHeartbeatTime;
-
-    @TableLogic
-    @TableField("deleted")
-    private Integer deleted;
 }

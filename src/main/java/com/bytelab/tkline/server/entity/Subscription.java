@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("subscription")
-public class Subscription {
+public class Subscription extends BaseEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
@@ -19,20 +19,4 @@ public class Subscription {
 
     @TableField("order_no")
     private String orderNo;
-
-    @TableField("create_time")
-    private LocalDateTime createTime;
-
-    @TableField("update_time")
-    private LocalDateTime updateTime;
-
-    @TableField("create_by")
-    private String createBy;
-
-    @TableField("update_by")
-    private String updateBy;
-
-    @TableLogic
-    @TableField("deleted")
-    private Integer deleted;
 }

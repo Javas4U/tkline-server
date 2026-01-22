@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("node_subscription_relation")
-public class NodeSubscriptionRelation {
+public class NodeSubscriptionRelation extends BaseEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
@@ -34,20 +34,4 @@ public class NodeSubscriptionRelation {
 
     @TableField("status")
     private Integer status;
-
-    @TableField("create_time")
-    private LocalDateTime createTime;
-
-    @TableField("create_by")
-    private String createBy;
-
-    @TableField("update_time")
-    private LocalDateTime updateTime;
-
-    @TableField("update_by")
-    private String updateBy;
-
-    @TableLogic
-    @TableField("deleted")
-    private Integer deleted;
 }

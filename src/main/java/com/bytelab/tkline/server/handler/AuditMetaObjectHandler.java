@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.bytelab.tkline.server.util.SecurityUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.reflection.MetaObject;
-import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
@@ -12,10 +11,10 @@ import java.time.LocalDateTime;
  * MyBatis-Plus 自动填充处理器
  * 处理审计字段的自动填充（使用用户名而非用户ID）
  * <p>
+ * 注意：此类不需要 @Component 注解，在 MybatisPlusConfig 中通过 @Bean 方式注册
  * 更新日期：2025-11-03（改用 SecurityUtils 获取用户信息）
  */
 @Slf4j
-@Component
 public class AuditMetaObjectHandler implements MetaObjectHandler {
 
     /**
