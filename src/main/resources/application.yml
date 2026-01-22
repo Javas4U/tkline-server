@@ -151,3 +151,24 @@ reality:
 api:
   service:
     secret: ${API_SERVICE_SECRET:wjTMOWKEzXJFTQUG7MLMPt7pOQ3qRMXRZVQowrKxvHg=}
+
+# 节点健康检查配置
+node:
+  health-check:
+    # 健康检查超时时间（毫秒）
+    timeout: ${NODE_HEALTH_CHECK_TIMEOUT:5000}
+    # sing-box Clash API 端口
+    clash-api-port: ${NODE_CLASH_API_PORT:9090}
+    # sing-box Clash API 密钥（用于认证）
+    clash-api-secret: ${NODE_CLASH_API_SECRET:5fcd85da-f3c5-4444-b497-ea759cef4248}
+    # 健康检查定时任务执行频率（Cron 表达式）
+    # 默认: 0 */3 * * * ? (每3分钟执行一次)
+    # 其他示例:
+    #   - 每分钟: 0 * * * * ?
+    #   - 每5分钟: 0 */5 * * * ?
+    #   - 每10分钟: 0 */10 * * * ?
+    #   - 每30分钟: 0 */30 * * * ?
+    check-cron: ${NODE_HEALTH_CHECK_CRON:0 */3 * * * ?}
+    # 清理离线节点定时任务执行频率（Cron 表达式）
+    # 默认: 0 0 2 * * ? (每天凌晨2点)
+    cleanup-cron: ${NODE_HEALTH_CLEANUP_CRON:0 0 2 * * ?}

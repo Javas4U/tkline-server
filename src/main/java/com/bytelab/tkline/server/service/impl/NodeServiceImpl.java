@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.config.RealityConfig;
 import com.bytelab.tkline.server.converter.NodeConverter;
 import com.bytelab.tkline.server.converter.SubscriptionConverter;
+import com.bytelab.tkline.server.converter.SubscriptionWithBindingConverter;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeCreateDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
@@ -22,7 +23,7 @@ import com.bytelab.tkline.server.mapper.NodeMapper;
 import com.bytelab.tkline.server.mapper.NodeSubscriptionRelationMapper;
 import com.bytelab.tkline.server.service.NodeService;
 import com.bytelab.tkline.server.util.HttpUtil;
-import com.bytelab.tkline.server.util.RealityKeyUtil;
+import com.bytelab.tkline.server.vo.SubscriptionWithBindingVO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -36,7 +37,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +56,8 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     private final NodeConverter nodeConverter;
 
     private final SubscriptionConverter subscriptionConverter;
+
+    private final SubscriptionWithBindingConverter subscriptionWithBindingConverter;
 
     private final NodeSubscriptionRelationMapper nodeSubscriptionRelationMapper;
 
@@ -79,8 +81,6 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
 
         // 2. 转换并保存
         Node node = nodeConverter.toEntity(createDTO);
-        node.setCreateBy("admin"); // TODO: 获取当前登录用户
-        node.setUpdateBy("admin");
 
         this.save(node);
         log.info("Node created: id={}, name={}", node.getId(), node.getName());
@@ -121,7 +121,15 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         wrapper.orderByDesc(Node::getId);
 
         IPage<Node> result = this.page(page, wrapper);
-        return result.convert(nodeConverter::toDTO);
+
+        // 转换为 DTO 并填充订阅数
+        return result.convert(node -> {
+            NodeDTO dto = nodeConverter.toDTO(node);
+            // 统计该节点的订阅数
+            Integer subscriptionCount = baseMapper.countSubscriptionsByNodeId(node.getId());
+            dto.setSubscriptionCount(subscriptionCount != null ? subscriptionCount : 0);
+            return dto;
+        });
     }
 
     @Override
@@ -155,8 +163,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
                 .set(Node::getDescription, updateDTO.getDescription())
                 .set(Node::getProtocols, updateDTO.getProtocols())
                 .set(Node::getUpstreamQuota, updateDTO.getUpstreamQuota())
-                .set(Node::getDownstreamQuota, updateDTO.getDownstreamQuota())
-                .set(Node::getUpdateBy, "admin"); // TODO: 当前用户
+                .set(Node::getDownstreamQuota, updateDTO.getDownstreamQuota());
 
         // 更新状态（如果提供了该字段）：online 布尔值转换为 status 整数 (0=离线, 1=在线)
         if (updateDTO.getOnline() != null) {
@@ -171,15 +178,15 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     public IPage<SubscriptionDTO> pageNodeSubscriptions(
             Long nodeId, PageQueryDTO query) {
         // 创建分页对象
-        Page<Subscription> page = new Page<>(
+        Page<SubscriptionWithBindingVO> page = new Page<>(
                 query.getPage(), query.getPageSize());
 
         // 执行查询 - 使用自定义SQL需要用baseMapper
-        IPage<Subscription> result = baseMapper.selectSubscriptionsByNodeId(page,
+        IPage<SubscriptionWithBindingVO> result = baseMapper.selectSubscriptionsByNodeId(page,
                 nodeId);
 
         // 转换结果
-        return result.convert(subscriptionConverter::toDTO);
+        return result.convert(subscriptionWithBindingConverter::toDTO);
     }
 
     @Override

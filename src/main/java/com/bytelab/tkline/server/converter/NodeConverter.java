@@ -8,13 +8,14 @@ import com.bytelab.tkline.server.entity.Node;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface NodeConverter {
 
     @Mapping(target = "statusLabel", expression = "java(com.bytelab.tkline.server.enums.NodeStatus.getLabelByCode(entity.getStatus()))")
-    @Mapping(target = "online", source = "status", qualifiedByName = "statusToOnline")
+    @Mapping(target = "online", source = "lastHeartbeatTime", qualifiedByName = "isOnlineFromHeartbeat")
     @Mapping(target = "subscriptionCount", ignore = true)
     NodeDTO toDTO(Node entity);
 
@@ -43,6 +44,18 @@ public interface NodeConverter {
     @org.mapstruct.Named("statusToOnline")
     default Boolean statusToOnline(Integer status) {
         return status != null && status == 1;
+    }
+
+    // 辅助方法：根据最后心跳时间判断节点是否在线（5分钟内有心跳即为在线）
+    @org.mapstruct.Named("isOnlineFromHeartbeat")
+    default Boolean isOnlineFromHeartbeat(LocalDateTime lastHeartbeatTime) {
+        if (lastHeartbeatTime == null) {
+            return false;
+        }
+        // 如果最后心跳时间在5分钟内，认为节点在线
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime threshold = now.minusMinutes(5);
+        return lastHeartbeatTime.isAfter(threshold);
     }
 
 }

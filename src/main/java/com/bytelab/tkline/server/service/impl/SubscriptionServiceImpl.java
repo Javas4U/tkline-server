@@ -57,8 +57,6 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
 
         // 2. 转换并保存订阅基本信息
         Subscription subscription = subscriptionConverter.toEntity(createDTO);
-        subscription.setCreateBy("admin"); // TODO: 获取当前登录用户
-        subscription.setUpdateBy("admin");
 
         // 如果没有提供orderNo，则使用雪花算法生成
         if (subscription.getOrderNo() == null || subscription.getOrderNo().isEmpty()) {
@@ -145,7 +143,6 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
 
         // 2. 转换并更新
         subscriptionConverter.updateEntityFromDto(updateDTO, existing);
-        existing.setUpdateBy("admin"); // TODO: current user
 
         boolean success = this.updateById(existing);
         if (!success) {

@@ -65,8 +65,6 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
                 relation.setSubscriptionId(subId);
                 relation.setStatus(1); // 默认有效
                 relation.setTrafficUsed(0L);
-                relation.setCreateTime(now);
-                relation.setCreateBy("admin"); // TODO: current user
                 relation.setDeleted(0);
                 toInsert.add(relation);
             }
@@ -109,8 +107,6 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
             relation.setTrafficLimit(binding.getTrafficLimit());
             relation.setTrafficUsed(0L);
             relation.setStatus(binding.getStatus() != null ? binding.getStatus() : 1); // 默认有效
-            relation.setCreateTime(now);
-            relation.setCreateBy("admin"); // TODO: current user
             relation.setDeleted(0);
             toInsert.add(relation);
 
@@ -150,14 +146,8 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
                 .collect(Collectors.toList());
 
         if (!idsToDelete.isEmpty()) {
-            for (Long id : idsToDelete) {
-                NodeSubscriptionRelation relation = new NodeSubscriptionRelation();
-                relation.setId(id);
-                relation.setDeleted(1);
-                relation.setUpdateTime(LocalDateTime.now());
-                relation.setUpdateBy("admin"); // TODO: current user
-                this.updateById(relation);
-            }
+            // 使用 removeByIds 进行逻辑删除,MyBatis-Plus 会自动处理
+            this.removeByIds(idsToDelete);
             log.info("Deleted {} node relations for subscription {}", idsToDelete.size(), subscriptionId);
         }
 
@@ -172,8 +162,6 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
                 relation.setSubscriptionId(subscriptionId);
                 relation.setStatus(1); // 默认有效
                 relation.setTrafficUsed(0L);
-                relation.setCreateTime(now);
-                relation.setCreateBy("admin"); // TODO: current user
                 relation.setDeleted(0);
                 toInsert.add(relation);
             }
@@ -189,6 +177,10 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void syncSubscriptionNodeBindings(Long subscriptionId, List<NodeSubscriptionBindDTO> bindings) {
+        if (bindings != null && !bindings.isEmpty()) {
+            bindings.stream().map(NodeSubscriptionBindDTO::getNodeId).toList();
+        }
+
         if (bindings == null) {
             bindings = new ArrayList<>();
         }
@@ -213,16 +205,14 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
                 .map(NodeSubscriptionRelation::getId)
                 .collect(Collectors.toList());
 
+            existingRelations.stream()
+                .filter(r -> !newNodeIds.contains(r.getNodeId()))
+                .map(NodeSubscriptionRelation::getNodeId)
+                .collect(Collectors.toList());
+
         if (!idsToDelete.isEmpty()) {
-            for (Long id : idsToDelete) {
-                NodeSubscriptionRelation relation = new NodeSubscriptionRelation();
-                relation.setId(id);
-                relation.setDeleted(1);
-                relation.setUpdateTime(LocalDateTime.now());
-                relation.setUpdateBy("admin"); // TODO: current user
-                this.updateById(relation);
-            }
-            log.info("Deleted {} node relations for subscription {}", idsToDelete.size(), subscriptionId);
+            // 使用 removeByIds 进行逻辑删除,MyBatis-Plus 会自动处理
+            this.removeByIds(idsToDelete);
         }
 
         // 3. 处理新增和更新
@@ -245,8 +235,6 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
                 relation.setTrafficLimit(binding.getTrafficLimit());
                 relation.setTrafficUsed(0L);
                 relation.setStatus(binding.getStatus() != null ? binding.getStatus() : 1);
-                relation.setCreateTime(now);
-                relation.setCreateBy("admin"); // TODO: current user
                 relation.setDeleted(0);
                 this.save(relation);
             } else {
@@ -261,13 +249,10 @@ public class NodeSubscriptionRelationServiceImpl extends ServiceImpl<NodeSubscri
                     existing.setValidTo(binding.getValidTo());
                     existing.setTrafficLimit(binding.getTrafficLimit());
                     existing.setStatus(binding.getStatus() != null ? binding.getStatus() : existing.getStatus());
-                    existing.setUpdateTime(now);
-                    existing.setUpdateBy("admin"); // TODO: current user
                     this.updateById(existing);
                 }
             }
         }
 
-        log.info("Synced {} node bindings for subscription {}", bindings.size(), subscriptionId);
     }
 }
