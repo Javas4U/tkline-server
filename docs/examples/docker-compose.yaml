@@ -4,17 +4,20 @@ services:
     container_name: singbox
     restart: always
     network_mode: host
+    environment:
+      - TZ=Asia/Shanghai
     volumes:
       - /root/projects/sing-box/config.json:/etc/sing-box/config.json
       - /root/projects/sing-box:/var/lib/sing-box
-      - /etc/letsencrypt/live/lostest.bytelab.com.cn:/etc/sing-box/cert:ro
+      - /etc/letsencrypt/live/{{DOMAIN}}:/etc/sing-box/cert:ro
     command: run -c /etc/sing-box/config.json
 
   config-updater:
-    build: .
+    image: registry.cn-shanghai.aliyuncs.com/bytelab/singbox-config-updater:0.2.0-corporate
     container_name: singbox-config-updater
     restart: always
     environment:
+      - TZ=Asia/Shanghai
       - API_BASE_URL=${API_BASE_URL}
       - API_KEY=${API_KEY}
       - SINGBOX_CONFIG_PATH=/etc/sing-box/config.json
