@@ -639,6 +639,99 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                 """ + (proxyNamesStr.isEmpty() ? "" : proxyNamesStr + "\n") + """
                       - DIRECT
 
+                rule-providers:
+                  geosite-tiktok:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/tiktok.yaml"
+                    path: ./ruleset/geosite-tiktok.yaml
+                    interval: 86400
+                  geosite-youtube:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/youtube.yaml"
+                    path: ./ruleset/geosite-youtube.yaml
+                    interval: 86400
+                  geosite-google:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/google.yaml"
+                    path: ./ruleset/geosite-google.yaml
+                    interval: 86400
+                  geosite-instagram:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/instagram.yaml"
+                    path: ./ruleset/geosite-instagram.yaml
+                    interval: 86400
+                  geosite-facebook:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/facebook.yaml"
+                    path: ./ruleset/geosite-facebook.yaml
+                    interval: 86400
+                  geosite-twitter:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/twitter.yaml"
+                    path: ./ruleset/geosite-twitter.yaml
+                    interval: 86400
+                  geosite-netflix:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/netflix.yaml"
+                    path: ./ruleset/geosite-netflix.yaml
+                    interval: 86400
+                  geosite-openai:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/openai.yaml"
+                    path: ./ruleset/geosite-openai.yaml
+                    interval: 86400
+                  geosite-telegram:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/telegram.yaml"
+                    path: ./ruleset/geosite-telegram.yaml
+                    interval: 86400
+                  geosite-spotify:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/spotify.yaml"
+                    path: ./ruleset/geosite-spotify.yaml
+                    interval: 86400
+                  geosite-github:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/github.yaml"
+                    path: ./ruleset/geosite-github.yaml
+                    interval: 86400
+                  geosite-linkedin:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/linkedin.yaml"
+                    path: ./ruleset/geosite-linkedin.yaml
+                    interval: 86400
+                  geosite-category-ads-all:
+                    type: http
+                    behavior: domain
+                    format: yaml
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/category-ads-all.yaml"
+                    path: ./ruleset/geosite-category-ads-all.yaml
+                    interval: 86400
+
                 rules:
                   # 局域网直连
                   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
@@ -647,8 +740,21 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
                   - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
                   - IP-CIDR6,fe80::/10,DIRECT,no-resolve
-                  # 强制走代理
-                  - DOMAIN-SUFFIX,linkedin.com,PROXY
+                  # 广告拦截
+                  - RULE-SET,geosite-category-ads-all,REJECT
+                  # 以下服务走代理
+                  - RULE-SET,geosite-tiktok,PROXY
+                  - RULE-SET,geosite-youtube,PROXY
+                  - RULE-SET,geosite-google,PROXY
+                  - RULE-SET,geosite-instagram,PROXY
+                  - RULE-SET,geosite-facebook,PROXY
+                  - RULE-SET,geosite-twitter,PROXY
+                  - RULE-SET,geosite-netflix,PROXY
+                  - RULE-SET,geosite-openai,PROXY
+                  - RULE-SET,geosite-telegram,PROXY
+                  - RULE-SET,geosite-spotify,PROXY
+                  - RULE-SET,geosite-github,PROXY
+                  - RULE-SET,geosite-linkedin,PROXY
                   # 中国大陆流量直连
                   - GEOIP,CN,DIRECT
                   - GEOSITE,CN,DIRECT
