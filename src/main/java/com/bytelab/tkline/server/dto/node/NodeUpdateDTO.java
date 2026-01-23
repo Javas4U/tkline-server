@@ -1,7 +1,10 @@
 package com.bytelab.tkline.server.dto.node;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 @Data
 public class NodeUpdateDTO {
@@ -12,7 +15,10 @@ public class NodeUpdateDTO {
     @Size(max = 100, message = "节点名称长度不能超过100")
     private String name;
 
-    @NotBlank(message = "IP地址不能为空")
+    @NotBlank(message = "域名不能为空")
+    @Size(max = 255, message = "域名长度不能超过255")
+    private String domain;
+
     @Size(max = 45, message = "IP地址长度不能超过45")
     private String ipAddress;
 
@@ -35,5 +41,10 @@ public class NodeUpdateDTO {
 
     @Min(value = 0, message = "下行配额不能为负数")
     private Integer downstreamQuota;
+
+    private Boolean online;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime serverExpiryDate;
 
 }

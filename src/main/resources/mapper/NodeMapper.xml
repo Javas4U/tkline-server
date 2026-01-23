@@ -2,13 +2,46 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.bytelab.tkline.server.mapper.NodeMapper">
 
-    <select id="selectSubscriptionsByNodeId" resultType="com.bytelab.tkline.server.entity.Subscription">
-        SELECT s.*
+    <resultMap id="SubscriptionWithBindingResultMap" type="com.bytelab.tkline.server.vo.SubscriptionWithBindingVO">
+        <id property="id" column="id"/>
+        <result property="groupName" column="group_name"/>
+        <result property="description" column="description"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="validFrom" column="valid_from"/>
+        <result property="validTo" column="valid_to"/>
+        <result property="trafficLimit" column="traffic_limit"/>
+        <result property="bindingStatus" column="binding_status"/>
+    </resultMap>
+
+    <select id="selectSubscriptionsByNodeId" resultMap="SubscriptionWithBindingResultMap">
+        SELECT s.id,
+               s.group_name,
+               s.description,
+               s.order_no,
+               s.create_time,
+               s.update_time,
+               s.create_by,
+               s.update_by,
+               nsr.valid_from,
+               nsr.valid_to,
+               nsr.traffic_limit,
+               nsr.status as binding_status
         FROM subscription s
         INNER JOIN node_subscription_relation nsr ON s.id = nsr.subscription_id
         WHERE nsr.node_id = #{nodeId}
           AND nsr.deleted = 0
           AND s.deleted = 0
+    </select>
+
+    <select id="countSubscriptionsByNodeId" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT nsr.subscription_id)
+        FROM node_subscription_relation nsr
+        WHERE nsr.node_id = #{nodeId}
+          AND nsr.deleted = 0
     </select>
 
 </mapper>

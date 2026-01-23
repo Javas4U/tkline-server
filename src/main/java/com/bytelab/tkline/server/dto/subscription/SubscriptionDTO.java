@@ -26,4 +26,19 @@ public class SubscriptionDTO {
     @Schema(description = "可用节点数")
     private Integer availableNodeCount;
 
+    // 绑定配置信息(仅在查询节点订阅时返回)
+    @Schema(description = "订阅开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime validFrom;
+
+    @Schema(description = "订阅结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime validTo;
+
+    @Schema(description = "流量限制(字节)")
+    private Long trafficLimit;
+
+    @Schema(description = "绑定状态")
+    private Integer bindingStatus;
+
 }

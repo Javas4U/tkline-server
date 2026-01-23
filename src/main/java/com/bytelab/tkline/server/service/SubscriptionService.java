@@ -8,6 +8,7 @@ import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
+import com.bytelab.tkline.server.dto.subscription.ProxyUserDTO;
 import com.bytelab.tkline.server.entity.Subscription;
 
 import java.io.UnsupportedEncodingException;
@@ -129,4 +130,16 @@ public interface SubscriptionService extends IService<Subscription> {
      * @return Base64编码的配置内容
      */
     String generateBase64Config(String orderNo, List<Long> nodeIdList, String baseUrl);
+
+    /**
+     * 根据节点IP获取代理用户信息(用于配置更新器)
+     * <p>
+     * 根据请求IP查询该节点订阅的用户信息,排除过期订阅
+     *
+     * @param nodeIp   节点IP地址
+     * @param page     页码
+     * @param pageSize 每页数量
+     * @return 代理用户信息分页列表
+     */
+    IPage<ProxyUserDTO> getProxyUsersByNodeIp(String nodeIp, Integer page, Integer pageSize);
 }

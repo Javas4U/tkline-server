@@ -7,12 +7,15 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("node")
-public class Node {
+public class Node extends BaseEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
     @TableField("name")
     private String name;
+
+    @TableField("domain")
+    private String domain;
 
     @TableField("ip_address")
     private String ipAddress;
@@ -32,34 +35,15 @@ public class Node {
     @TableField("protocols")
     private String protocols;
 
-    @TableField("reality_public_key")
-    private String realityPublicKey;
-
-    @TableField("reality_private_key")
-    private String realityPrivateKey;
-
     @TableField("upstream_quota")
     private Integer upstreamQuota;
 
     @TableField("downstream_quota")
     private Integer downstreamQuota;
 
-    @TableField("create_time")
-    private LocalDateTime createTime;
-
-    @TableField("update_time")
-    private LocalDateTime updateTime;
-
-    @TableField("create_by")
-    private String createBy;
-
-    @TableField("update_by")
-    private String updateBy;
-
     @TableField("last_heartbeat_time")
     private LocalDateTime lastHeartbeatTime;
 
-    @TableLogic
-    @TableField("deleted")
-    private Integer deleted;
+    @TableField("server_expiry_date")
+    private LocalDateTime serverExpiryDate;
 }

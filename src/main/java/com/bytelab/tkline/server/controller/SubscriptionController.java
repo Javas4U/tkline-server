@@ -10,6 +10,7 @@ import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
 import com.bytelab.tkline.server.dto.subscription.SubscriptionUpdateDTO;
+import com.bytelab.tkline.server.dto.subscription.ProxyUserDTO;
 import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.service.SubscriptionService;
 import com.bytelab.tkline.server.service.util.QRCodeService;
@@ -21,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -79,6 +81,27 @@ public class SubscriptionController {
     @GetMapping("/getSubscriptionNodeIds/{id}")
     public ApiResult<java.util.List<Long>> getSubscriptionNodeIds(@PathVariable Long id) {
         return ApiResult.success(subscriptionService.getSubscriptionNodeIds(id));
+    }
+
+    /**
+     * 获取订阅用户信息(用于配置更新器)
+     * <p>
+     * 根据请求方IP地址查询该节点订阅的用户信息,排除过期订阅
+     * 返回有效订阅的用户信息,包含 name(group_name), uuid/password(orderNo), protocol
+     */
+    @GetMapping("/users")
+    @Operation(summary = "获取订阅用户列表", description = "根据请求IP获取该节点的订阅用户信息,用于配置更新器同步用户")
+    public ApiResult<IPage<ProxyUserDTO>> getSubscriptionUsers(
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "1000") Integer pageSize,
+            HttpServletRequest request) {
+
+        // 获取请求方IP地址
+        String clientIp = HttpUtil.getClientIp(request);
+        log.info("获取订阅用户列表请求: clientIp={}, page={}, pageSize={}", clientIp, page, pageSize);
+
+        IPage<ProxyUserDTO> result = subscriptionService.getProxyUsersByNodeIp(clientIp, page, pageSize);
+        return ApiResult.success(result);
     }
 
     /**
@@ -215,7 +238,8 @@ public class SubscriptionController {
             String contentType;
             boolean isBrowser = isBrowser(userAgent);
 
-            Subscription subscription = this.subscriptionService.getOne(new LambdaQueryWrapper<Subscription>().eq(Subscription::getOrderNo, orderNo));
+            Subscription subscription = this.subscriptionService
+                    .getOne(new LambdaQueryWrapper<Subscription>().eq(Subscription::getOrderNo, orderNo));
             String filename = subscription.getGroupName();
 
             // 使用 HttpUtil 动态获取 baseUrl,支持反向代理
@@ -268,9 +292,14 @@ public class SubscriptionController {
             log.info("订阅配置生成成功: orderNo={}, nodeCount={}, contentType={}, configSize={}",
                     orderNo, nodeIdList != null ? nodeIdList.size() : "all", contentType, config.length());
 
+            ContentDisposition contentDisposition = ContentDisposition
+                    .inline()
+                    .filename(filename, java.nio.charset.StandardCharsets.UTF_8)
+                    .build();
+
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, contentType + ";charset=utf-8")
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                     .header("profile-update-interval", "24")
                     .header("subscription-userinfo", "upload=0; download=0; total=10737418240; expire=2147483647")
                     .body(config);

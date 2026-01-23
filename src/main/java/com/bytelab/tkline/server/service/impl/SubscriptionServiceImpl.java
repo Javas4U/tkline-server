@@ -1,17 +1,16 @@
 package com.bytelab.tkline.server.service.impl;
+
+import com.bytelab.tkline.server.dto.subscription.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.bytelab.tkline.server.config.RealityConfig;
 import com.bytelab.tkline.server.converter.SubscriptionConverter;
 import com.bytelab.tkline.server.dto.PageQueryDTO;
 import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionCreateDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionQueryDTO;
-import com.bytelab.tkline.server.dto.subscription.SubscriptionUpdateDTO;
 import com.bytelab.tkline.server.entity.Node;
 import com.bytelab.tkline.server.entity.NodeSubscriptionRelation;
 import com.bytelab.tkline.server.entity.Subscription;
@@ -39,12 +38,14 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Subscription> implements SubscriptionService {
+public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Subscription>
+        implements SubscriptionService {
 
     private final SubscriptionConverter subscriptionConverter;
     private final NodeSubscriptionRelationService nodeSubscriptionRelationService;
     private final NodeSubscriptionRelationMapper nodeSubscriptionRelationMapper;
     private final NodeMapper nodeMapper;
+    private final RealityConfig realityConfig;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -58,8 +59,6 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
 
         // 2. 转换并保存订阅基本信息
         Subscription subscription = subscriptionConverter.toEntity(createDTO);
-        subscription.setCreateBy("admin"); // TODO: 获取当前登录用户
-        subscription.setUpdateBy("admin");
 
         // 如果没有提供orderNo，则使用雪花算法生成
         if (subscription.getOrderNo() == null || subscription.getOrderNo().isEmpty()) {
@@ -146,7 +145,6 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
 
         // 2. 转换并更新
         subscriptionConverter.updateEntityFromDto(updateDTO, existing);
-        existing.setUpdateBy("admin"); // TODO: current user
 
         boolean success = this.updateById(existing);
         if (!success) {
@@ -252,7 +250,8 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
     // ========== 订阅配置生成方法 ==========
 
     @Override
-    public String generateYamlConfig(String orderNo, List<Long> nodeIds, String baseUrl) throws UnsupportedEncodingException {
+    public String generateYamlConfig(String orderNo, List<Long> nodeIds, String baseUrl)
+            throws UnsupportedEncodingException {
         log.info("生成YAML配置: orderNo={}, nodeIds={}", orderNo, nodeIds);
 
         // 1. 查询订阅信息
@@ -276,7 +275,8 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
     }
 
     @Override
-    public String generateJsonConfig(String orderNo, List<Long> nodeIdList, String baseUrl) throws UnsupportedEncodingException {
+    public String generateJsonConfig(String orderNo, List<Long> nodeIdList, String baseUrl)
+            throws UnsupportedEncodingException {
         log.info("生成JSON配置: orderNo={}, nodeIds={}", orderNo, nodeIdList);
 
         // 1. 查询订阅信息
@@ -341,7 +341,8 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
         if (StringUtils.isNotBlank(node.getProtocols())) {
             try {
                 ObjectMapper mapper = new ObjectMapper();
-                List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<List<String>>() {});
+                List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<>() {
+                });
 
                 for (String proto : protos) {
                     int port = getProtocolPort(proto, node.getPort());
@@ -364,22 +365,28 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
     private String buildProtocolUri(String protocol, String uuid, Node node, int port, String name) {
         String protoLower = protocol.toLowerCase();
         String nodeName = name + "-" + protocol.toUpperCase();
+        String server = getServerAddress(node);
 
         switch (protoLower) {
             case "hy2":
             case "hysteria2":
-                // Hysteria2: hysteria2://password@host:port/?params
+                // Hysteria2: hysteria2://password@host:port?params
+                // 注意: Hysteria2 基于 UDP/QUIC 协议，Shadowrocket 使用 TCP 延迟测试时不会发送请求
+                // 建议客户端将延迟测试方法改为 ICMP
                 StringBuilder hy2Uri = new StringBuilder();
-                hy2Uri.append(String.format("hysteria2://%s@%s:%d/?sni=%s&obfs=salamander&obfs-password=NTdhMjdhMjAwMjRkYWEzYg==",
-                        uuid, node.getIpAddress(), port, node.getIpAddress()));
+                // obfs-password 需要 URL 编码, = 编码为 %3D
+                String obfsPassword = "NTdhMjdhMjAwMjRkYWEzYg%3D%3D";
+                hy2Uri.append(String.format(
+                        "hysteria2://%s@%s:%d?obfs=salamander&obfs-password=%s",
+                        uuid, server, port, obfsPassword));
 
-                // 添加上行和下行带宽配置
-                if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
-                    hy2Uri.append("&up_mbps=").append(node.getUpstreamQuota());
+                // 只有当 server 不是 IP 地址时才添加 SNI
+                if (!server.matches("^(\\d{1,3}\\.){3}\\d{1,3}$")) {
+                    hy2Uri.append("&sni=").append(server);
                 }
-                if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
-                    hy2Uri.append("&down_mbps=").append(node.getDownstreamQuota());
-                }
+
+                // 添加性能优化参数
+                hy2Uri.append("&mptcp=0&fast-open=1");
 
                 hy2Uri.append("#").append(nodeName);
                 return hy2Uri.toString();
@@ -387,18 +394,17 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
             case "vless":
             case "reality":
                 // VLESS+Reality: vless://uuid@host:port?params
-                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                        ? node.getRealityPublicKey()
-                        : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
+                String publicKey = realityConfig.getPublicKey();
+                String shortId = realityConfig.getShortId();
                 return String.format(
-                        "vless://%s@%s:%d?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=a1b2c3d4#%s",
-                        uuid, node.getIpAddress(), port, publicKey, nodeName);
+                        "vless://%s@%s:%d?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=%s#%s",
+                        uuid, server, port, publicKey, shortId, nodeName);
 
             case "trojan":
                 // Trojan: trojan://password@host:port?params
                 return String.format(
                         "trojan://%s@%s:%d?sni=%s&allowInsecure=0#%s",
-                        uuid, node.getIpAddress(), port, node.getIpAddress(), nodeName);
+                        uuid, server, port, server, nodeName);
 
             default:
                 log.warn("Unknown protocol '{}' for node '{}'", protocol, node.getName());
@@ -454,7 +460,8 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
     /**
      * 构建Clash YAML配置
      */
-    private String buildClashYaml(Subscription subscription, List<Node> nodes, String baseUrl) throws UnsupportedEncodingException {
+    private String buildClashYaml(Subscription subscription, List<Node> nodes, String baseUrl)
+            throws UnsupportedEncodingException {
         // 订单号本身就是 UUID 格式，直接作为认证凭证
         String uuid = subscription.getOrderNo();
 
@@ -483,10 +490,14 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                             boolean isHy1 = "hy2".equalsIgnoreCase(p1) || "hysteria2".equalsIgnoreCase(p1);
                             boolean isHy2 = "hy2".equalsIgnoreCase(p2) || "hysteria2".equalsIgnoreCase(p2);
 
-                            if (isVless1 && !isVless2) return -1;
-                            if (!isVless1 && isVless2) return 1;
-                            if (isHy1 && !isHy2) return -1;
-                            if (!isHy1 && isHy2) return 1;
+                            if (isVless1 && !isVless2)
+                                return -1;
+                            if (!isVless1 && isVless2)
+                                return 1;
+                            if (isHy1 && !isHy2)
+                                return -1;
+                            if (!isHy1 && isHy2)
+                                return 1;
                             return p1.compareToIgnoreCase(p2);
                         });
 
@@ -494,13 +505,14 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                             String proxyName = node.getName() + "-" + proto.toUpperCase();
                             // 根据协议获取对应的标准端口
                             int port = getProtocolPort(proto, node.getPort());
+                            String server = getServerAddress(node);
 
                             if ("hy2".equalsIgnoreCase(proto) || "hysteria2".equalsIgnoreCase(proto)) {
                                 // Hysteria2 - 使用 UUID 作为 password
                                 proxyNames.add("      - \"" + proxyName + "\"");
                                 proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
                                 proxiesBuilder.append("    type: hysteria2\n");
-                                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    server: ").append(server).append("\n");
                                 proxiesBuilder.append("    port: ").append(port).append("\n");
                                 proxiesBuilder.append("    password: ").append(uuid).append("\n");
                                 // 添加上行和下行带宽配置
@@ -510,8 +522,11 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                                 if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
                                     proxiesBuilder.append("    down: ").append(node.getDownstreamQuota()).append("\n");
                                 }
-                                proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
-                                proxiesBuilder.append("    skip-cert-verify: false\n");
+                                // 只有当 server 不是 IP 地址时才添加 SNI
+                                if (!server.matches("^(\\d{1,3}\\.){3}\\d{1,3}$")) {
+                                    proxiesBuilder.append("    sni: ").append(server).append("\n");
+                                }
+                                proxiesBuilder.append("    skip-cert-verify: true\n");
                                 proxiesBuilder.append("    obfs: salamander\n");
                                 proxiesBuilder.append("    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==\n");
                                 generated = true;
@@ -520,21 +535,20 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                                 proxyNames.add("      - \"" + proxyName + "\"");
                                 proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
                                 proxiesBuilder.append("    type: vless\n");
-                                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    server: ").append(server).append("\n");
                                 proxiesBuilder.append("    port: ").append(port).append("\n");
                                 proxiesBuilder.append("    uuid: ").append(uuid).append("\n");
                                 proxiesBuilder.append("    network: tcp\n");
                                 proxiesBuilder.append("    tls: true\n");
                                 proxiesBuilder.append("    udp: true\n");
-                                // proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                                // proxiesBuilder.append(" flow: xtls-rprx-vision\n");
                                 proxiesBuilder.append("    servername: www.cloudflare.com\n");
                                 proxiesBuilder.append("    reality-opts:\n");
-                                // 使用数据库中保存的 Reality 公钥
-                                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                                    ? node.getRealityPublicKey()
-                                    : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
-                                proxiesBuilder.append("      public-key: ").append(publicKey).append("\n");
-                                proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                                // 使用配置中的 Reality 公钥
+                                proxiesBuilder.append("      public-key: ").append(realityConfig.getPublicKey())
+                                        .append("\n");
+                                proxiesBuilder.append("      short-id: ").append(realityConfig.getShortId())
+                                        .append("\n");
                                 proxiesBuilder.append("    client-fingerprint: chrome\n");
                                 generated = true;
                             } else if ("trojan".equalsIgnoreCase(proto)) {
@@ -542,10 +556,10 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                                 proxyNames.add("      - \"" + proxyName + "\"");
                                 proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
                                 proxiesBuilder.append("    type: trojan\n");
-                                proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    server: ").append(server).append("\n");
                                 proxiesBuilder.append("    port: ").append(port).append("\n");
                                 proxiesBuilder.append("    password: ").append(uuid).append("\n");
-                                proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
+                                proxiesBuilder.append("    sni: ").append(server).append("\n");
                                 proxiesBuilder.append("    skip-cert-verify: false\n");
                                 proxiesBuilder.append("    udp: true\n");
                                 generated = true;
@@ -562,32 +576,30 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
             if (!generated) {
                 // Fallback to legacy port-based logic
                 String proxyName = node.getName();
+                String server = getServerAddress(node);
                 proxyNames.add("      - \"" + proxyName + "\"");
                 if (node.getPort() == 8443) {
                     // VLESS+Reality (legacy) - 端口 8443
                     proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
                     proxiesBuilder.append("    type: vless\n");
-                    proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                    proxiesBuilder.append("    server: ").append(server).append("\n");
                     proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
                     proxiesBuilder.append("    uuid: ").append(uuid).append("\n");
                     proxiesBuilder.append("    network: tcp\n");
                     proxiesBuilder.append("    tls: true\n");
                     proxiesBuilder.append("    udp: true\n");
-                    // proxiesBuilder.append("    flow: xtls-rprx-vision\n");
+                    // proxiesBuilder.append(" flow: xtls-rprx-vision\n");
                     proxiesBuilder.append("    servername: www.cloudflare.com\n");
                     proxiesBuilder.append("    reality-opts:\n");
-                    // 使用数据库中保存的 Reality 公钥
-                    String legacyPublicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                        ? node.getRealityPublicKey()
-                        : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
-                    proxiesBuilder.append("      public-key: ").append(legacyPublicKey).append("\n");
-                    proxiesBuilder.append("      short-id: a1b2c3d4\n");
+                    // 使用配置中的 Reality 公钥
+                    proxiesBuilder.append("      public-key: ").append(realityConfig.getPublicKey()).append("\n");
+                    proxiesBuilder.append("      short-id: ").append(realityConfig.getShortId()).append("\n");
                     proxiesBuilder.append("    client-fingerprint: chrome\n");
                 } else {
                     // Hysteria2 (legacy) - 使用 UUID 作为 password
                     proxiesBuilder.append("  - name: \"").append(proxyName).append("\"\n");
                     proxiesBuilder.append("    type: hysteria2\n");
-                    proxiesBuilder.append("    server: ").append(node.getIpAddress()).append("\n");
+                    proxiesBuilder.append("    server: ").append(server).append("\n");
                     proxiesBuilder.append("    port: ").append(node.getPort()).append("\n");
                     proxiesBuilder.append("    password: ").append(uuid).append("\n");
                     // 添加上行和下行带宽配置
@@ -597,7 +609,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                     if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
                         proxiesBuilder.append("    down: ").append(node.getDownstreamQuota()).append("\n");
                     }
-                    proxiesBuilder.append("    sni: ").append(node.getIpAddress()).append("\n");
+                    proxiesBuilder.append("    sni: ").append(server).append("\n");
                     proxiesBuilder.append("    skip-cert-verify: false\n");
                     proxiesBuilder.append("    obfs: salamander\n");
                     proxiesBuilder.append("    obfs-password: NTdhMjdhMjAwMjRkYWEzYg==\n");
@@ -613,34 +625,142 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
         String proxyNamesStr = String.join("\n", proxyNames);
 
         String config = """
-# Clash Meta 配置文件模板
-# 订阅组: """ + subscription.getGroupName() + "\n" + """
-# 订阅编号: """ + subscription.getOrderNo() + "\n" + """
+                # Clash Meta 配置文件模板
+                # 订阅组: """ + subscription.getGroupName() + "\n" + """
+                # 订阅编号: """ + subscription.getOrderNo() + "\n" + """
 
-proxies:
-""" + (proxiesStr.isEmpty() ? "" : proxiesStr + "\n") + """
+                proxies:
+                """ + (proxiesStr.isEmpty() ? "" : proxiesStr + "\n") + """
 
-proxy-groups:
-  - name: PROXY
-    type: select
-    proxies:
-""" + (proxyNamesStr.isEmpty() ? "" : proxyNamesStr + "\n") + """
-      - DIRECT
+                proxy-groups:
+                  - name: PROXY
+                    type: select
+                    proxies:
+                """ + (proxyNamesStr.isEmpty() ? "" : proxyNamesStr + "\n") + """
+                      - DIRECT
 
-rules:
-  # 局域网直连
-  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
-  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
-  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
-  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
-  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
-  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
-  # 中国大陆流量直连
-  - GEOIP,CN,DIRECT
-  - GEOSITE,CN,DIRECT
-  # 其他流量走代理
-  - MATCH,PROXY
-""";
+                rule-providers:
+                  geosite-tiktok:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tiktok.mrs"
+                    path: ./ruleset/geosite-tiktok.mrs
+                    interval: 86400
+                  geosite-youtube:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/youtube.mrs"
+                    path: ./ruleset/geosite-youtube.mrs
+                    interval: 86400
+                  geosite-google:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.mrs"
+                    path: ./ruleset/geosite-google.mrs
+                    interval: 86400
+                  geosite-instagram:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/instagram.mrs"
+                    path: ./ruleset/geosite-instagram.mrs
+                    interval: 86400
+                  geosite-facebook:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/facebook.mrs"
+                    path: ./ruleset/geosite-facebook.mrs
+                    interval: 86400
+                  geosite-twitter:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/twitter.mrs"
+                    path: ./ruleset/geosite-twitter.mrs
+                    interval: 86400
+                  geosite-netflix:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs"
+                    path: ./ruleset/geosite-netflix.mrs
+                    interval: 86400
+                  geosite-openai:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.mrs"
+                    path: ./ruleset/geosite-openai.mrs
+                    interval: 86400
+                  geosite-telegram:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.mrs"
+                    path: ./ruleset/geosite-telegram.mrs
+                    interval: 86400
+                  geosite-spotify:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.mrs"
+                    path: ./ruleset/geosite-spotify.mrs
+                    interval: 86400
+                  geosite-github:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.mrs"
+                    path: ./ruleset/geosite-github.mrs
+                    interval: 86400
+                  geosite-linkedin:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/linkedin.mrs"
+                    path: ./ruleset/geosite-linkedin.mrs
+                    interval: 86400
+                  geosite-category-ads-all:
+                    type: http
+                    behavior: domain
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs"
+                    path: ./ruleset/geosite-category-ads-all.mrs
+                    interval: 86400
+
+                rules:
+                  # 局域网直连
+                  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+                  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+                  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+                  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+                  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
+                  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+                  # 广告拦截
+                  - RULE-SET,geosite-category-ads-all,REJECT
+                  # 以下服务走代理
+                  - RULE-SET,geosite-tiktok,PROXY
+                  - RULE-SET,geosite-youtube,PROXY
+                  - RULE-SET,geosite-google,PROXY
+                  - RULE-SET,geosite-instagram,PROXY
+                  - RULE-SET,geosite-facebook,PROXY
+                  - RULE-SET,geosite-twitter,PROXY
+                  - RULE-SET,geosite-netflix,PROXY
+                  - RULE-SET,geosite-openai,PROXY
+                  - RULE-SET,geosite-telegram,PROXY
+                  - RULE-SET,geosite-spotify,PROXY
+                  - RULE-SET,geosite-github,PROXY
+                  - RULE-SET,geosite-linkedin,PROXY
+                  # 中国大陆流量直连
+                  - GEOIP,CN,DIRECT
+                  - GEOSITE,CN,DIRECT
+                  # 其他流量走代理
+                  - MATCH,PROXY
+                """;
 
         return config;
     }
@@ -648,7 +768,8 @@ rules:
     /**
      * 构建Sing-Box JSON配置
      */
-    private String buildSingBoxJson(Subscription subscription, List<Node> nodes, String baseUrl) throws UnsupportedEncodingException {
+    private String buildSingBoxJson(Subscription subscription, List<Node> nodes, String baseUrl)
+            throws UnsupportedEncodingException {
         // 订单号本身就是 UUID 格式，直接作为认证凭证
         String uuid = subscription.getOrderNo();
 
@@ -666,7 +787,8 @@ rules:
             if (StringUtils.isNotBlank(node.getProtocols())) {
                 try {
                     ObjectMapper mapper = new ObjectMapper();
-                    List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<List<String>>() {});
+                    List<String> protos = mapper.readValue(node.getProtocols(), new TypeReference<List<String>>() {
+                    });
 
                     if (!protos.isEmpty()) {
                         // 自定义协议排序：VLESS 第一，Hysteria2 第二，其他按字母排序
@@ -676,10 +798,14 @@ rules:
                             boolean isHy1 = "hy2".equalsIgnoreCase(p1) || "hysteria2".equalsIgnoreCase(p1);
                             boolean isHy2 = "hy2".equalsIgnoreCase(p2) || "hysteria2".equalsIgnoreCase(p2);
 
-                            if (isVless1 && !isVless2) return -1;
-                            if (!isVless1 && isVless2) return 1;
-                            if (isHy1 && !isHy2) return -1;
-                            if (!isHy1 && isHy2) return 1;
+                            if (isVless1 && !isVless2)
+                                return -1;
+                            if (!isVless1 && isVless2)
+                                return 1;
+                            if (isHy1 && !isHy2)
+                                return -1;
+                            if (!isHy1 && isHy2)
+                                return 1;
                             return p1.compareToIgnoreCase(p2);
                         });
 
@@ -687,21 +813,24 @@ rules:
                             String tag = node.getName() + "-" + proto.toUpperCase();
                             // 根据协议获取对应的标准端口
                             int port = getProtocolPort(proto, node.getPort());
+                            String server = getServerAddress(node);
 
                             if ("hy2".equalsIgnoreCase(proto) || "hysteria2".equalsIgnoreCase(proto)) {
                                 // Hysteria2 - 使用 UUID 作为 password
                                 outboundsBuilder.append("        {\n");
                                 outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
                                 outboundsBuilder.append("            \"type\": \"hysteria2\",\n");
-                                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("            \"server\": \"").append(server).append("\",\n");
                                 outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
                                 outboundsBuilder.append("            \"password\": \"").append(uuid).append("\",\n");
                                 // 添加上行和下行带宽配置
                                 if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
-                                    outboundsBuilder.append("            \"up_mbps\": ").append(node.getUpstreamQuota()).append(",\n");
+                                    outboundsBuilder.append("            \"up_mbps\": ").append(node.getUpstreamQuota())
+                                            .append(",\n");
                                 }
                                 if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
-                                    outboundsBuilder.append("            \"down_mbps\": ").append(node.getDownstreamQuota()).append(",\n");
+                                    outboundsBuilder.append("            \"down_mbps\": ")
+                                            .append(node.getDownstreamQuota()).append(",\n");
                                 }
                                 outboundsBuilder.append("            \"obfs\": {\n");
                                 outboundsBuilder.append("                \"type\": \"salamander\",\n");
@@ -709,61 +838,69 @@ rules:
                                 outboundsBuilder.append("            },\n");
                                 outboundsBuilder.append("            \"tls\": {\n");
                                 outboundsBuilder.append("                \"enabled\": true,\n");
-                                outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("                \"server_name\": \"").append(server)
+                                        .append("\",\n");
                                 outboundsBuilder.append("                \"alpn\": [\n");
                                 outboundsBuilder.append("                    \"h3\"\n");
                                 outboundsBuilder.append("                ]\n");
                                 outboundsBuilder.append("            }\n");
                                 outboundsBuilder.append("        },\n");
-                                if ("direct".equals(firstTag)) firstTag = tag;
+                                if ("direct".equals(firstTag))
+                                    firstTag = tag;
                                 generated = true;
                             } else if ("vless".equalsIgnoreCase(proto) || "reality".equalsIgnoreCase(proto)) {
                                 // VLESS+Reality
                                 outboundsBuilder.append("        {\n");
                                 outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
                                 outboundsBuilder.append("            \"type\": \"vless\",\n");
-                                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("            \"server\": \"").append(server).append("\",\n");
                                 outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
                                 outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n"); // 客户端身份认证凭证
-                                // outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                                // outboundsBuilder.append(" \"flow\": \"xtls-rprx-vision\",\n");
                                 outboundsBuilder.append("            \"tls\": {\n");
                                 outboundsBuilder.append("                \"enabled\": true,\n");
-                                outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n"); // 服务器域名 告诉服务器要伪装成哪个网站
-                                outboundsBuilder.append("                \"utls\": {\n"); // 客户端指纹 告诉服务器要使用哪个指纹 模拟真实浏览器的 TLS 握手指纹
+                                outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n"); // 服务器域名
+                                                                                                                       // 告诉服务器要伪装成哪个网站
+                                outboundsBuilder.append("                \"utls\": {\n"); // 客户端指纹 告诉服务器要使用哪个指纹 模拟真实浏览器的
+                                                                                          // TLS 握手指纹
                                 outboundsBuilder.append("                    \"enabled\": true,\n");
-                                outboundsBuilder.append("                    \"fingerprint\": \"chrome\"\n"); // 模拟 Chrome 浏览器
+                                outboundsBuilder.append("                    \"fingerprint\": \"chrome\"\n"); // 模拟
+                                                                                                              // Chrome
+                                                                                                              // 浏览器
                                 outboundsBuilder.append("                },\n");
                                 outboundsBuilder.append("                \"reality\": {\n");
                                 outboundsBuilder.append("                    \"enabled\": true,\n");
-                                // 使用数据库中保存的 Reality 公钥
-                                String publicKey = StringUtils.isNotBlank(node.getRealityPublicKey())
-                                    ? node.getRealityPublicKey()
-                                    : "qieBrB5cCYg1cRxWoK6xw5oXDwHk2L-cjb9uHanpghU";
-                                outboundsBuilder.append("                    \"public_key\": \"").append(publicKey).append("\",\n");
-                                outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                                // 使用配置中的 Reality 公钥
+                                outboundsBuilder.append("                    \"public_key\": \"")
+                                        .append(realityConfig.getPublicKey()).append("\",\n");
+                                outboundsBuilder.append("                    \"short_id\": \"")
+                                        .append(realityConfig.getShortId()).append("\"\n");
                                 outboundsBuilder.append("                }\n");
                                 outboundsBuilder.append("            }\n");
                                 outboundsBuilder.append("        },\n");
-                                if ("direct".equals(firstTag)) firstTag = tag;
+                                if ("direct".equals(firstTag))
+                                    firstTag = tag;
                                 generated = true;
                             } else if ("trojan".equalsIgnoreCase(proto)) {
                                 // Trojan - 使用 UUID 作为 password
                                 outboundsBuilder.append("        {\n");
                                 outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
                                 outboundsBuilder.append("            \"type\": \"trojan\",\n");
-                                outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("            \"server\": \"").append(server).append("\",\n");
                                 outboundsBuilder.append("            \"server_port\": ").append(port).append(",\n");
                                 outboundsBuilder.append("            \"password\": \"").append(uuid).append("\",\n");
                                 outboundsBuilder.append("            \"tls\": {\n");
                                 outboundsBuilder.append("                \"enabled\": true,\n");
-                                outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                                outboundsBuilder.append("                \"server_name\": \"").append(server)
+                                        .append("\",\n");
                                 outboundsBuilder.append("                \"alpn\": [\n");
                                 outboundsBuilder.append("                    \"h2\",\n");
                                 outboundsBuilder.append("                    \"http/1.1\"\n");
                                 outboundsBuilder.append("                ]\n");
                                 outboundsBuilder.append("            }\n");
                                 outboundsBuilder.append("        },\n");
-                                if ("direct".equals(firstTag)) firstTag = tag;
+                                if ("direct".equals(firstTag))
+                                    firstTag = tag;
                                 generated = true;
                             } else {
                                 log.warn("Unknown protocol '{}' for node '{}'", proto, node.getName());
@@ -778,15 +915,16 @@ rules:
             if (!generated) {
                 // Fallback to legacy port-based logic
                 String tag = node.getName();
+                String server = getServerAddress(node);
                 if (node.getPort() == 8443) {
                     // VLESS+Reality (legacy) - 端口 8443
                     outboundsBuilder.append("        {\n");
                     outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
                     outboundsBuilder.append("            \"type\": \"vless\",\n");
-                    outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                    outboundsBuilder.append("            \"server\": \"").append(server).append("\",\n");
                     outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
                     outboundsBuilder.append("            \"uuid\": \"").append(uuid).append("\",\n");
-                    // outboundsBuilder.append("            \"flow\": \"xtls-rprx-vision\",\n");
+                    // outboundsBuilder.append(" \"flow\": \"xtls-rprx-vision\",\n");
                     outboundsBuilder.append("            \"tls\": {\n");
                     outboundsBuilder.append("                \"enabled\": true,\n");
                     outboundsBuilder.append("                \"server_name\": \"www.cloudflare.com\",\n");
@@ -796,8 +934,10 @@ rules:
                     outboundsBuilder.append("                },\n");
                     outboundsBuilder.append("                \"reality\": {\n");
                     outboundsBuilder.append("                    \"enabled\": true,\n");
-                    outboundsBuilder.append("                    \"public_key\": \"").append(node.getRealityPublicKey()).append("\",\n");
-                    outboundsBuilder.append("                    \"short_id\": \"a1b2c3d4\"\n");
+                    outboundsBuilder.append("                    \"public_key\": \"")
+                            .append(realityConfig.getPublicKey()).append("\",\n");
+                    outboundsBuilder.append("                    \"short_id\": \"").append(realityConfig.getShortId())
+                            .append("\"\n");
                     outboundsBuilder.append("                }\n");
                     outboundsBuilder.append("            }\n");
                     outboundsBuilder.append("        },\n");
@@ -806,15 +946,17 @@ rules:
                     outboundsBuilder.append("        {\n");
                     outboundsBuilder.append("            \"tag\": \"").append(tag).append("\",\n");
                     outboundsBuilder.append("            \"type\": \"hysteria2\",\n");
-                    outboundsBuilder.append("            \"server\": \"").append(node.getIpAddress()).append("\",\n");
+                    outboundsBuilder.append("            \"server\": \"").append(server).append("\",\n");
                     outboundsBuilder.append("            \"server_port\": ").append(node.getPort()).append(",\n");
                     outboundsBuilder.append("            \"password\": \"").append(uuid).append("\",\n");
                     // 添加上行和下行带宽配置
                     if (node.getUpstreamQuota() != null && node.getUpstreamQuota() > 0) {
-                        outboundsBuilder.append("            \"up_mbps\": ").append(node.getUpstreamQuota()).append(",\n");
+                        outboundsBuilder.append("            \"up_mbps\": ").append(node.getUpstreamQuota())
+                                .append(",\n");
                     }
                     if (node.getDownstreamQuota() != null && node.getDownstreamQuota() > 0) {
-                        outboundsBuilder.append("            \"down_mbps\": ").append(node.getDownstreamQuota()).append(",\n");
+                        outboundsBuilder.append("            \"down_mbps\": ").append(node.getDownstreamQuota())
+                                .append(",\n");
                     }
                     outboundsBuilder.append("            \"obfs\": {\n");
                     outboundsBuilder.append("                \"type\": \"salamander\",\n");
@@ -822,14 +964,15 @@ rules:
                     outboundsBuilder.append("            },\n");
                     outboundsBuilder.append("            \"tls\": {\n");
                     outboundsBuilder.append("                \"enabled\": true,\n");
-                    outboundsBuilder.append("                \"server_name\": \"").append(node.getIpAddress()).append("\",\n");
+                    outboundsBuilder.append("                \"server_name\": \"").append(server).append("\",\n");
                     outboundsBuilder.append("                \"alpn\": [\n");
                     outboundsBuilder.append("                    \"h3\"\n");
                     outboundsBuilder.append("                ]\n");
                     outboundsBuilder.append("            }\n");
                     outboundsBuilder.append("        },\n");
                 }
-                if ("direct".equals(firstTag)) firstTag = tag;
+                if ("direct".equals(firstTag))
+                    firstTag = tag;
             }
         }
 
@@ -842,129 +985,131 @@ rules:
         }
 
         String config = """
-{
-    "outbounds": [
-""" + (outboundsStr.isEmpty() ? "" : outboundsStr + ",\n") + """
-        {
-            "type": "direct",
-            "tag": "direct"
-        },
-        {
-            "type": "dns",
-            "tag": "dns-out"
-        },
-        {
-            "type": "block",
-            "tag": "block"
-        }
-    ],
-    "dns": {
-        "servers": [
-            {
-                "tag": "google",
-                "address": "https://8.8.8.8/dns-query",
-                "address_resolver": "local"
-            },
-            {
-                "tag": "cloudflare",
-                "address": "https://1.1.1.1/dns-query",
-                "address_resolver": "local"
-            },
-            {
-                "tag": "local",
-                "address": "223.5.5.5",
-                "detour": "direct"
-            },
-            {
-                "tag": "block",
-                "address": "rcode://success"
-            }
-        ],
-        "rules": [
-            {
-                "outbound": "any",
-                "server": "local"
-            },
-            {
-                "rule_set": "geosite-category-ads-all",
-                "server": "block"
-            },
-            {
-                "rule_set": "geosite-cn",
-                "server": "local"
-            },
-            {
-                "clash_mode": "direct",
-                "server": "local"
-            },
-            {
-                "clash_mode": "global",
-                "server": "google"
-            }
-        ],
-        "final": "google",
-        "strategy": "prefer_ipv4"
-    },
-    "route": {
-        "auto_detect_interface": true,
-        "final": \"""" + finalOutbound + """
-",
-        "rule_set": [
-            {
-                "tag": "geosite-cn",
-                "type": "remote",
-                "format": "binary",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
-                "download_detour": "direct"
-            },
-            {
-                "tag": "geoip-cn",
-                "type": "remote",
-                "format": "binary",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
-                "download_detour": "direct"
-            },
-            {
-                "tag": "geosite-category-ads-all",
-                "type": "remote",
-                "format": "binary",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-                "download_detour": "direct"
-            }
-        ],
-        "rules": [
-            {
-                "protocol": "dns",
-                "outbound": "dns-out"
-            },
-            {
-                "rule_set": "geosite-category-ads-all",
-                "outbound": "block"
-            },
-            {
-                "ip_is_private": true,
-                "outbound": "direct"
-            },
-            {
-                "clash_mode": "direct",
-                "outbound": "direct"
-            },
-            {
-                "clash_mode": "global",
-                "outbound": \"""" + finalOutbound + """
-"
-            },
-            {
-                "rule_set": [
-                    "geoip-cn",
-                    "geosite-cn"
+                {
+                    "outbounds": [
+                """ + (outboundsStr.isEmpty() ? "" : outboundsStr + ",\n") + """
+                    {
+                        "type": "direct",
+                        "tag": "direct"
+                    },
+                    {
+                        "type": "dns",
+                        "tag": "dns-out"
+                    },
+                    {
+                        "type": "block",
+                        "tag": "block"
+                    }
                 ],
-                "outbound": "direct"
-            }
-        ]
-    }
-}
-""";
+                "dns": {
+                    "servers": [
+                        {
+                            "tag": "google",
+                            "address": "https://8.8.8.8/dns-query",
+                            "address_resolver": "local"
+                        },
+                        {
+                            "tag": "cloudflare",
+                            "address": "https://1.1.1.1/dns-query",
+                            "address_resolver": "local"
+                        },
+                        {
+                            "tag": "local",
+                            "address": "223.5.5.5",
+                            "detour": "direct"
+                        },
+                        {
+                            "tag": "block",
+                            "address": "rcode://success"
+                        }
+                    ],
+                    "rules": [
+                        {
+                            "outbound": "any",
+                            "server": "local"
+                        },
+                        {
+                            "rule_set": "geosite-category-ads-all",
+                            "server": "block"
+                        },
+                        {
+                            "rule_set": "geosite-cn",
+                            "server": "local"
+                        },
+                        {
+                            "clash_mode": "direct",
+                            "server": "local"
+                        },
+                        {
+                            "clash_mode": "global",
+                            "server": "google"
+                        }
+                    ],
+                    "final": "google",
+                    "strategy": "prefer_ipv4"
+                },
+                "route": {
+                    "auto_detect_interface": true,
+                    "final": \"""" + finalOutbound
+                + """
+                        ",
+                                "rule_set": [
+                                    {
+                                        "tag": "geosite-cn",
+                                        "type": "remote",
+                                        "format": "binary",
+                                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+                                        "download_detour": "direct"
+                                    },
+                                    {
+                                        "tag": "geoip-cn",
+                                        "type": "remote",
+                                        "format": "binary",
+                                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+                                        "download_detour": "direct"
+                                    },
+                                    {
+                                        "tag": "geosite-category-ads-all",
+                                        "type": "remote",
+                                        "format": "binary",
+                                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+                                        "download_detour": "direct"
+                                    }
+                                ],
+                                "rules": [
+                                    {
+                                        "protocol": "dns",
+                                        "outbound": "dns-out"
+                                    },
+                                    {
+                                        "rule_set": "geosite-category-ads-all",
+                                        "outbound": "block"
+                                    },
+                                    {
+                                        "ip_is_private": true,
+                                        "outbound": "direct"
+                                    },
+                                    {
+                                        "clash_mode": "direct",
+                                        "outbound": "direct"
+                                    },
+                                    {
+                                        "clash_mode": "global",
+                                        "outbound": \""""
+                + finalOutbound + """
+                        "
+                                    },
+                                    {
+                                        "rule_set": [
+                                            "geoip-cn",
+                                            "geosite-cn"
+                                        ],
+                                        "outbound": "direct"
+                                    }
+                                ]
+                            }
+                        }
+                        """;
 
         return config;
     }
@@ -996,9 +1141,22 @@ rules:
     }
 
     /**
+     * 获取节点的服务器地址(优先使用域名,否则使用IP)
+     *
+     * @param node 节点对象
+     * @return 服务器地址
+     */
+    private String getServerAddress(Node node) {
+        if (StringUtils.isNotBlank(node.getDomain())) {
+            return node.getDomain();
+        }
+        return node.getIpAddress();
+    }
+
+    /**
      * 根据协议类型获取标准端口
      *
-     * @param protocol 协议类型 (vless, hy2, trojan, tuic等)
+     * @param protocol     协议类型 (vless, hy2, trojan, tuic等)
      * @param fallbackPort 如果协议未定义标准端口，使用的回退端口
      * @return 协议对应的端口号
      */
@@ -1009,10 +1167,10 @@ rules:
 
         // 标准协议端口映射（与服务端配置一致）
         return switch (protocol.toLowerCase()) {
-            case "vless", "reality" -> 8443;      // VLESS+Reality 使用 8443
-            case "hy2", "hysteria2" -> 443;       // Hysteria2 使用 443
-            case "trojan" -> 9443;                // Trojan 使用 9443
-            case "tuic" -> 10443;                 // TUIC 使用 10443
+            case "vless", "reality" -> 8443; // VLESS+Reality 使用 8443
+            case "hy2", "hysteria2" -> 7443; // Hysteria2 使用 7443
+            case "trojan" -> 9443; // Trojan 使用 9443
+            case "tuic" -> 10443; // TUIC 使用 10443
             default -> {
                 log.warn("Unknown protocol '{}', using fallback port: {}", protocol, fallbackPort);
                 yield fallbackPort;
@@ -1038,5 +1196,145 @@ rules:
             log.error("加载模板失败: {}", templateName, e);
             throw new BusinessException("加载配置模板失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public IPage<ProxyUserDTO> getProxyUsersByNodeIp(String nodeIp, Integer page, Integer pageSize) {
+        log.info("根据节点IP获取代理用户列表: nodeIp={}, page={}, pageSize={}", nodeIp, page, pageSize);
+
+        // 创建分页对象
+        Page<ProxyUserDTO> resultPage = new Page<>(page, pageSize);
+
+        // 1. 根据IP地址查询节点
+        List<Node> nodes = nodeMapper.selectList(
+                new LambdaQueryWrapper<Node>()
+                        .eq(Node::getIpAddress, nodeIp)
+                        .eq(Node::getDeleted, 0));
+
+        if (nodes.isEmpty()) {
+            log.warn("未找到IP地址为 {} 的节点", nodeIp);
+            return resultPage;
+        }
+
+        // 2. 获取所有节点ID
+        List<Long> nodeIds = nodes.stream()
+                .map(Node::getId)
+                .collect(Collectors.toList());
+
+        log.info("找到 {} 个节点: {}", nodes.size(), nodeIds);
+
+        // 3. 查询这些节点的有效订阅关系(分页,排除过期订阅)
+        Page<NodeSubscriptionRelation> relationPage = new Page<>(page, pageSize);
+        LambdaQueryWrapper<NodeSubscriptionRelation> wrapper = new LambdaQueryWrapper<NodeSubscriptionRelation>()
+                .in(NodeSubscriptionRelation::getNodeId, nodeIds)
+                .eq(NodeSubscriptionRelation::getStatus, 1) // 状态为1表示有效
+                .and(w -> w.isNull(NodeSubscriptionRelation::getValidTo) // valid_to为NULL视为永久有效
+                        .or()
+                        .gt(NodeSubscriptionRelation::getValidTo, java.time.LocalDateTime.now())) // 或者有效期未过期
+                .orderByDesc(NodeSubscriptionRelation::getCreateTime);
+
+        log.debug("查询订阅关系 - 节点IDs: {}, 当前时间: {}", nodeIds, java.time.LocalDateTime.now());
+        nodeSubscriptionRelationMapper.selectPage(relationPage, wrapper);
+
+        if (relationPage.getRecords().isEmpty()) {
+            log.warn("该节点没有有效的订阅关联关系 - 尝试查询所有关联关系以便调试");
+            // 调试：查询该节点的所有订阅关系（不考虑有效期）
+            List<NodeSubscriptionRelation> allRelations = nodeSubscriptionRelationMapper.selectList(
+                    new LambdaQueryWrapper<NodeSubscriptionRelation>()
+                            .in(NodeSubscriptionRelation::getNodeId, nodeIds));
+            log.info("该节点总共有 {} 条订阅关系记录", allRelations.size());
+            for (NodeSubscriptionRelation rel : allRelations) {
+                log.info("订阅关系详情 - ID: {}, subscriptionId: {}, status: {}, validFrom: {}, validTo: {}, deleted: {}",
+                        rel.getId(), rel.getSubscriptionId(), rel.getStatus(),
+                        rel.getValidFrom(), rel.getValidTo(), rel.getDeleted());
+            }
+            return resultPage;
+        }
+
+        log.info("找到 {} 条有效订阅关系", relationPage.getRecords().size());
+
+        // 4. 获取关联的订阅信息
+        Set<Long> subscriptionIds = relationPage.getRecords().stream()
+                .map(NodeSubscriptionRelation::getSubscriptionId)
+                .collect(Collectors.toSet());
+
+        // 批量查询订阅
+        Map<Long, Subscription> subscriptionMap = this.listByIds(subscriptionIds).stream()
+                .collect(Collectors.toMap(Subscription::getId, s -> s));
+
+        // 创建节点Map以便查询协议
+        Map<Long, Node> nodeMap = nodes.stream()
+                .collect(Collectors.toMap(Node::getId, n -> n));
+
+        // 5. 构建代理用户列表
+        List<ProxyUserDTO> proxyUsers = new ArrayList<>();
+
+        for (NodeSubscriptionRelation relation : relationPage.getRecords()) {
+            Subscription subscription = subscriptionMap.get(relation.getSubscriptionId());
+            Node node = nodeMap.get(relation.getNodeId());
+
+            if (subscription == null || node == null) {
+                log.warn("订阅或节点不存在: subscriptionId={}, nodeId={}",
+                        relation.getSubscriptionId(), relation.getNodeId());
+                continue;
+            }
+
+            // 解析节点支持的协议列表
+            String protocols = node.getProtocols();
+            if (StringUtils.isBlank(protocols)) {
+                log.warn("节点 {} 没有配置协议", node.getId());
+                continue;
+            }
+
+            // 尝试解析JSON格式的协议列表
+            List<String> protocolList = new ArrayList<>();
+            try {
+                // 首先尝试JSON数组格式 ["vless", "hy2"]
+                ObjectMapper mapper = new ObjectMapper();
+                protocolList = mapper.readValue(protocols, new TypeReference<List<String>>() {
+                });
+            } catch (Exception e) {
+                // 如果JSON解析失败,尝试逗号分隔格式
+                String[] protocolArray = protocols.split(",");
+                for (String protocol : protocolArray) {
+                    String trimmed = protocol.trim();
+                    if (!trimmed.isEmpty()) {
+                        protocolList.add(trimmed);
+                    }
+                }
+            }
+
+            if (protocolList.isEmpty()) {
+                log.warn("节点 {} 的协议列表为空", node.getId());
+                continue;
+            }
+
+            // 为每个协议创建一条代理用户记录,使用subscription表的order_no
+            for (String protocol : protocolList) {
+                String trimmedProtocol = protocol.trim().toLowerCase();
+                if (StringUtils.isBlank(trimmedProtocol)) {
+                    continue;
+                }
+
+                ProxyUserDTO proxyUser = new ProxyUserDTO();
+                proxyUser.setName(subscription.getGroupName());
+                proxyUser.setUuid(subscription.getOrderNo()); // 从subscription表获取
+                proxyUser.setPassword(subscription.getOrderNo()); // 从subscription表获取
+                proxyUser.setProtocol(trimmedProtocol);
+
+                proxyUsers.add(proxyUser);
+            }
+        }
+
+        // 6. 设置分页信息
+        resultPage.setRecords(proxyUsers);
+        resultPage.setTotal(relationPage.getTotal()
+                * (proxyUsers.isEmpty() ? 1 : proxyUsers.size() / Math.max(relationPage.getRecords().size(), 1)));
+        resultPage.setCurrent(page);
+        resultPage.setSize(pageSize);
+
+        log.info("成功获取节点 {} 的代理用户列表: 总关系数={}, 返回用户数={}", nodeIp, relationPage.getTotal(), proxyUsers.size());
+
+        return resultPage;
     }
 }

@@ -9,6 +9,7 @@ import lombok.Data;
 public class NodeDTO {
     private Long id;
     private String name;
+    private String domain;
     private String ipAddress;
     private Integer port;
     private String region;
@@ -18,12 +19,6 @@ public class NodeDTO {
 
     @Schema(description = "支持的协议列表，如 [\"hy2\",\"vmess\",\"trojan\"]")
     private String protocols;
-
-    @Schema(description = "Reality 协议公钥")
-    private String realityPublicKey;
-
-    @Schema(description = "Reality 协议私钥")
-    private String realityPrivateKey;
 
     @Schema(description = "上行配额(Mbps)")
     private Integer upstreamQuota;
@@ -42,6 +37,10 @@ public class NodeDTO {
     @Schema(description = "是否在线")
     private Boolean online;
     private Integer subscriptionCount;
+
+    @Schema(description = "服务器到期时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime serverExpiryDate;
 
     // 绑定配置信息(仅在查询订阅节点时返回)
     @Schema(description = "绑定有效期开始时间")

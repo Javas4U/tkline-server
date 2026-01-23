@@ -7,10 +7,48 @@ on:
       - '[0-9]+.*'  # 匹配所有版本分支: 0.1.0, 0.4.0, 1.0.0, 2.3.4 等
     tags:
       - 'v*'
+    paths:
+      # Java 源代码和资源文件
+      - 'src/main/java/**'
+      - 'src/main/resources/**'
+      - 'src/test/**'
+      # Maven 构建配置
+      - 'pom.xml'
+      # Docker 相关文件
+      - 'docker/**'
+      # GitHub Actions 工作流
+      - '.github/workflows/docker-publish.yml'
+      # 排除文档和非代码文件
+      - '!**.md'
+      - '!docs/**'
+      - '!*.txt'
+      - '!LICENSE'
+      - '!.gitignore'
+      - '!HELP.md'
+      - '!API_CONFIG_UPDATER.md'
   pull_request:
     branches:
       - main
       - '[0-9]+.*'
+    paths:
+      # Java 源代码和资源文件
+      - 'src/main/java/**'
+      - 'src/main/resources/**'
+      - 'src/test/**'
+      # Maven 构建配置
+      - 'pom.xml'
+      # Docker 相关文件
+      - 'docker/**'
+      # GitHub Actions 工作流
+      - '.github/workflows/docker-publish.yml'
+      # 排除文档和非代码文件
+      - '!**.md'
+      - '!docs/**'
+      - '!*.txt'
+      - '!LICENSE'
+      - '!.gitignore'
+      - '!HELP.md'
+      - '!API_CONFIG_UPDATER.md'
   workflow_dispatch:
 
 env:
@@ -53,8 +91,6 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            # 每次提交都打上唯一的 commit SHA tag(短格式7位)
-            type=sha,prefix={{branch}}-,format=short
             # 分支名作为"最新版本"指针,会被后续提交覆盖(这是预期行为)
             type=ref,event=branch
             # 始终打上 latest tag,指向最新构建的镜像

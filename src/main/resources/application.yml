@@ -136,3 +136,39 @@ cache:
     max-size: 50000      # 最多缓存token数
     cleanup-cron: "0 0 * * * ?"  # 每小时清理过期token
     blacklist-cleanup-cron: "0 0 3 * * ?"  # 每天凌晨3点清理黑名单
+
+# Reality 协议配置
+reality:
+  # Reality 公钥（用于客户端配置）
+  public-key: ${REALITY_PUBLIC_KEY:Rv6ciZx97Yu5hu8573QqD1HGcRo-YBrl7T8tW-yEf2s}
+  # Reality 私钥（用于服务端配置，请勿公开）
+  private-key: ${REALITY_PRIVATE_KEY:sBBzieowhwXQDjR2LA3DEfYVOVBBc8rhl_pfAXRomU8}
+  # Reality Short ID
+  short-id: ${REALITY_SHORT_ID:a1b2c3d4}
+
+# API服务密钥（从配置文件读取，用于验证外部服务身份，如 singbox-config-updater）
+# API_SERVICE_SECRET (生成命令：openssl rand -base64 32)
+api:
+  service:
+    secret: ${API_SERVICE_SECRET:wjTMOWKEzXJFTQUG7MLMPt7pOQ3qRMXRZVQowrKxvHg=}
+
+# 节点健康检查配置
+node:
+  health-check:
+    # 健康检查超时时间（毫秒）
+    timeout: ${NODE_HEALTH_CHECK_TIMEOUT:5000}
+    # sing-box Clash API 端口
+    clash-api-port: ${NODE_CLASH_API_PORT:9090}
+    # sing-box Clash API 密钥（用于认证）
+    clash-api-secret: ${NODE_CLASH_API_SECRET:5fcd85da-f3c5-4444-b497-ea759cef4248}
+    # 健康检查定时任务执行频率（Cron 表达式）
+    # 默认: 0 */3 * * * ? (每3分钟执行一次)
+    # 其他示例:
+    #   - 每分钟: 0 * * * * ?
+    #   - 每5分钟: 0 */5 * * * ?
+    #   - 每10分钟: 0 */10 * * * ?
+    #   - 每30分钟: 0 */30 * * * ?
+    check-cron: ${NODE_HEALTH_CHECK_CRON:0 */3 * * * ?}
+    # 清理离线节点定时任务执行频率（Cron 表达式）
+    # 默认: 0 0 2 * * ? (每天凌晨2点)
+    cleanup-cron: ${NODE_HEALTH_CLEANUP_CRON:0 0 2 * * ?}
