@@ -38,6 +38,10 @@ public class NodeDTO {
     private Boolean online;
     private Integer subscriptionCount;
 
+    @Schema(description = "服务器到期时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime serverExpiryDate;
+
     // 绑定配置信息(仅在查询订阅节点时返回)
     @Schema(description = "绑定有效期开始时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

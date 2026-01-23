@@ -43,4 +43,7 @@ public class Node extends BaseEntity {
 
     @TableField("last_heartbeat_time")
     private LocalDateTime lastHeartbeatTime;
+
+    @TableField("server_expiry_date")
+    private LocalDateTime serverExpiryDate;
 }

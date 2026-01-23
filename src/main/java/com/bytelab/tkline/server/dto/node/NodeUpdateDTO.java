@@ -1,7 +1,10 @@
 package com.bytelab.tkline.server.dto.node;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 @Data
 public class NodeUpdateDTO {
@@ -40,5 +43,8 @@ public class NodeUpdateDTO {
     private Integer downstreamQuota;
 
     private Boolean online;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime serverExpiryDate;
 
 }

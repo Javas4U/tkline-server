@@ -163,7 +163,8 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
                 .set(Node::getDescription, updateDTO.getDescription())
                 .set(Node::getProtocols, updateDTO.getProtocols())
                 .set(Node::getUpstreamQuota, updateDTO.getUpstreamQuota())
-                .set(Node::getDownstreamQuota, updateDTO.getDownstreamQuota());
+                .set(Node::getDownstreamQuota, updateDTO.getDownstreamQuota())
+                .set(Node::getServerExpiryDate, updateDTO.getServerExpiryDate());
 
         // 更新状态（如果提供了该字段）：online 布尔值转换为 status 整数 (0=离线, 1=在线)
         if (updateDTO.getOnline() != null) {

@@ -1,7 +1,10 @@
 package com.bytelab.tkline.server.dto.node;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 @Data
 public class NodeCreateDTO {
@@ -35,4 +38,7 @@ public class NodeCreateDTO {
 
     @Min(value = 0, message = "下行配额不能为负数")
     private Integer downstreamQuota;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime serverExpiryDate;
 }
