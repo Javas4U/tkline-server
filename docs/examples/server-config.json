@@ -17,21 +17,27 @@
     "dns": {
         "servers": [
             {
+                "tag": "default-resolver",
+                "type": "local"
+            },
+            {
                 "tag": "google",
-                "address": "tls://8.8.8.8",
-                "detour": "direct"
+                "type": "tls",
+                "server": "8.8.8.8"
             },
             {
                 "tag": "cloudflare",
-                "address": "tls://1.1.1.1",
-                "detour": "direct"
+                "type": "tls",
+                "server": "1.1.1.1"
             },
             {
                 "tag": "dns-fake",
-                "address": "fakeip",
-                "strategy": "ipv4_only"
+                "type": "fakeip",
+                "inet4_range": "198.18.0.0/15",
+                "inet6_range": "fc00::/18"
             }
         ],
+        "strategy": "ipv4_only",
         "rules": [
             {
                 "rule_set": [
@@ -57,10 +63,6 @@
                 "server": "dns-fake"
             }
         ],
-        "fakeip": {
-            "enabled": true,
-            "inet4_range": "198.18.0.0/15"
-        },
         "independent_cache": true
     },
     "inbounds": [
@@ -68,7 +70,7 @@
             "type": "hysteria2",
             "tag": "hy2-in",
             "listen": "::",
-            "listen_port": 443,
+            "listen_port": 7443,
             "ignore_client_bandwidth": false,
             "tcp_fast_open": true,
             "tcp_multi_path": false,
@@ -90,52 +92,6 @@
                     "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015"
                 }
             ]
-        },
-        {
-            "type": "tuic",
-            "tag": "tuic-in",
-            "listen": "::",
-            "listen_port": 10443,
-            "tcp_fast_open": true,
-            "tcp_multi_path": false,
-            "users": [
-                {
-                    "uuid": "52a7d83e-9a51-41d4-a58e-4d987cb4a018",
-                    "password": "c7921ebd04d93a67a18fd82c98e2c774",
-                    "name": "tkline-admin"
-                }
-            ],
-            "tls": {
-                "enabled": true,
-                "alpn": [
-                    "h3"
-                ],
-                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
-                "key_path": "/etc/sing-box/cert/privkey.pem"
-            }
-        },
-        {
-            "type": "trojan",
-            "tag": "trojan-in",
-            "listen": "::",
-            "listen_port": 9443,
-            "tcp_fast_open": true,
-            "tcp_multi_path": false,
-            "users": [
-                {
-                    "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
-                    "name": "tkline-admin"
-                }
-            ],
-            "tls": {
-                "enabled": true,
-                "alpn": [
-                    "h2",
-                    "http/1.1"
-                ],
-                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
-                "key_path": "/etc/sing-box/cert/privkey.pem"
-            }
         },
         {
             "type": "vless",
@@ -165,6 +121,52 @@
                     ],
                     "max_time_difference": "1m"
                 }
+            }
+        },
+        {
+            "type": "trojan",
+            "tag": "trojan-in",
+            "listen": "::",
+            "listen_port": 9443,
+            "tcp_fast_open": true,
+            "tcp_multi_path": false,
+            "users": [
+                {
+                    "password": "3a7ca20a-4e92-408c-af5b-8a69abbd0015",
+                    "name": "tkline-admin"
+                }
+            ],
+            "tls": {
+                "enabled": true,
+                "alpn": [
+                    "h2",
+                    "http/1.1"
+                ],
+                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
+                "key_path": "/etc/sing-box/cert/privkey.pem"
+            }
+        },
+        {
+            "type": "tuic",
+            "tag": "tuic-in",
+            "listen": "::",
+            "listen_port": 10443,
+            "tcp_fast_open": true,
+            "tcp_multi_path": false,
+            "users": [
+                {
+                    "uuid": "52a7d83e-9a51-41d4-a58e-4d987cb4a018",
+                    "password": "c7921ebd04d93a67a18fd82c98e2c774",
+                    "name": "tkline-admin"
+                }
+            ],
+            "tls": {
+                "enabled": true,
+                "alpn": [
+                    "h3"
+                ],
+                "certificate_path": "/etc/sing-box/cert/fullchain.pem",
+                "key_path": "/etc/sing-box/cert/privkey.pem"
             }
         }
     ],
@@ -319,7 +321,8 @@
             }
         ],
         "auto_detect_interface": false,
-        "default_domain_resolver": "google"
+        "override_android_vpn": false,
+        "default_domain_resolver": "default-resolver"
     },
     "outbounds": [
         {
