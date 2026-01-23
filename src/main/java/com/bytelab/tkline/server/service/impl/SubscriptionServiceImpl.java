@@ -643,93 +643,93 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                   geosite-tiktok:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/tiktok.yaml"
-                    path: ./ruleset/geosite-tiktok.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tiktok.mrs"
+                    path: ./ruleset/geosite-tiktok.mrs
                     interval: 86400
                   geosite-youtube:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/youtube.yaml"
-                    path: ./ruleset/geosite-youtube.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/youtube.mrs"
+                    path: ./ruleset/geosite-youtube.mrs
                     interval: 86400
                   geosite-google:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/google.yaml"
-                    path: ./ruleset/geosite-google.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.mrs"
+                    path: ./ruleset/geosite-google.mrs
                     interval: 86400
                   geosite-instagram:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/instagram.yaml"
-                    path: ./ruleset/geosite-instagram.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/instagram.mrs"
+                    path: ./ruleset/geosite-instagram.mrs
                     interval: 86400
                   geosite-facebook:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/facebook.yaml"
-                    path: ./ruleset/geosite-facebook.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/facebook.mrs"
+                    path: ./ruleset/geosite-facebook.mrs
                     interval: 86400
                   geosite-twitter:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/twitter.yaml"
-                    path: ./ruleset/geosite-twitter.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/twitter.mrs"
+                    path: ./ruleset/geosite-twitter.mrs
                     interval: 86400
                   geosite-netflix:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/netflix.yaml"
-                    path: ./ruleset/geosite-netflix.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs"
+                    path: ./ruleset/geosite-netflix.mrs
                     interval: 86400
                   geosite-openai:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/openai.yaml"
-                    path: ./ruleset/geosite-openai.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.mrs"
+                    path: ./ruleset/geosite-openai.mrs
                     interval: 86400
                   geosite-telegram:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/telegram.yaml"
-                    path: ./ruleset/geosite-telegram.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.mrs"
+                    path: ./ruleset/geosite-telegram.mrs
                     interval: 86400
                   geosite-spotify:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/spotify.yaml"
-                    path: ./ruleset/geosite-spotify.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.mrs"
+                    path: ./ruleset/geosite-spotify.mrs
                     interval: 86400
                   geosite-github:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/github.yaml"
-                    path: ./ruleset/geosite-github.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.mrs"
+                    path: ./ruleset/geosite-github.mrs
                     interval: 86400
                   geosite-linkedin:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/linkedin.yaml"
-                    path: ./ruleset/geosite-linkedin.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/linkedin.mrs"
+                    path: ./ruleset/geosite-linkedin.mrs
                     interval: 86400
                   geosite-category-ads-all:
                     type: http
                     behavior: domain
-                    format: yaml
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo-lite/geosite/category-ads-all.yaml"
-                    path: ./ruleset/geosite-category-ads-all.yaml
+                    format: mrs
+                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs"
+                    path: ./ruleset/geosite-category-ads-all.mrs
                     interval: 86400
 
                 rules:
