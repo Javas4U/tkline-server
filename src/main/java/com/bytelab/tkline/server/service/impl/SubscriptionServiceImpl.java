@@ -647,6 +647,8 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
                   - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
                   - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+                  # 强制走代理
+                  - DOMAIN-SUFFIX,linkedin.com,PROXY
                   # 中国大陆流量直连
                   - GEOIP,CN,DIRECT
                   - GEOSITE,CN,DIRECT

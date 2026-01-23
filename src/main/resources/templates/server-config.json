@@ -51,7 +51,8 @@
                     "geosite-openai",
                     "geosite-telegram",
                     "geosite-spotify",
-                    "geosite-github"
+                    "geosite-github",
+                    "geosite-linkedin"
                 ],
                 "server": "cloudflare"
             },
@@ -250,6 +251,13 @@
                 "download_detour": "direct"
             },
             {
+                "tag": "geosite-linkedin",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-linkedin.srs",
+                "download_detour": "direct"
+            },
+            {
                 "tag": "geosite-category-ads-all",
                 "type": "remote",
                 "format": "binary",
@@ -313,6 +321,10 @@
             },
             {
                 "rule_set": "geosite-github",
+                "outbound": "direct"
+            },
+            {
+                "rule_set": "geosite-linkedin",
                 "outbound": "direct"
             },
             {
