@@ -14,6 +14,9 @@ public class SubscriptionCreateDTO {
     @Schema(description = "订单号")
     private String orderNo;
 
+    @Schema(description = "是否付费用户:0=未付费,1=已付费")
+    private Integer isPaid;
+
     @Schema(description = "备注")
     private String description;
 }

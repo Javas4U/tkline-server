@@ -22,6 +22,12 @@ public class SubscriptionUpdateDTO {
     private String orderNo;
 
     /**
+     * 是否付费用户
+     */
+    @Schema(description = "是否付费用户:0=未付费,1=已付费")
+    private Integer isPaid;
+
+    /**
      * 描述
      */
     @Schema(description = "描述")

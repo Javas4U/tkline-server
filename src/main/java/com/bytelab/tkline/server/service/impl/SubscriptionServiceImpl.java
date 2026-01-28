@@ -68,9 +68,14 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
             subscription.setOrderNo(SubscriptionOrderGenerator.generateOrderNo());
         }
 
+        // 如果没有提供isPaid，默认设置为0(未付费)
+        if (subscription.getIsPaid() == null) {
+            subscription.setIsPaid(0);
+        }
+
         this.save(subscription);
-        log.info("Subscription created: id={}, groupName={}, orderNo={}",
-                subscription.getId(), subscription.getGroupName(), subscription.getOrderNo());
+        log.info("Subscription created: id={}, groupName={}, orderNo={}, isPaid={}",
+                subscription.getId(), subscription.getGroupName(), subscription.getOrderNo(), subscription.getIsPaid());
 
         return subscription.getId();
     }
