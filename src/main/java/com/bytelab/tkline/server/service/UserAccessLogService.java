@@ -12,4 +12,13 @@ public interface UserAccessLogService extends IService<UserAccessLog> {
      * @param reportDTO 日志上报数据
      */
     void processLogReport(AccessLogReportDTO reportDTO);
+
+    /**
+     * 分页查询访问日志
+     *
+     * @param queryDTO 查询参数
+     * @return 分页结果
+     */
+    com.baomidou.mybatisplus.core.metadata.IPage<UserAccessLog> pageQuery(
+            com.bytelab.tkline.server.dto.log.UserAccessLogQueryDTO queryDTO);
 }

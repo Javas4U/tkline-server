@@ -44,9 +44,11 @@ services:
       - /root/projects/sing-box/logs:/var/log/sing-box
       - /root/projects/sing-box/singbox-logrotate.conf:/etc/logrotate.d/sing-box
     command: >
-      /bin/sh -c "apk add --no-cache logrotate && 
+      /bin/sh -c "apk add --no-cache logrotate tzdata && 
+      cp /usr/share/zoneinfo/$$TZ /etc/localtime &&
+      echo $$TZ > /etc/timezone &&
       chmod 644 /etc/logrotate.d/sing-box &&
-      echo '0 * * * * /usr/sbin/logrotate /etc/logrotate.d/sing-box --verbose' > /etc/crontabs/root &&
+      echo '0 * * * * /usr/sbin/logrotate /etc/logrotate.d/sing-box --verbose -s /var/log/sing-box/logrotate.status' > /etc/crontabs/root &&
       crond -f -d 8"
 
   config-updater:
@@ -62,6 +64,7 @@ services:
       - RESTART_SINGBOX=${RESTART_SINGBOX:-true}
       - SINGBOX_CONTAINER_NAME=singbox
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_DIR=/var/log/sing-box
     volumes:
       - /root/projects/sing-box/:/etc/sing-box/
       - /root/projects/sing-box/logs:/var/log/sing-box:ro

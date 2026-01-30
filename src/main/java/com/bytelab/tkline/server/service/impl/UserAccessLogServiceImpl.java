@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bytelab.tkline.server.dto.log.AccessLogItemDTO;
 import com.bytelab.tkline.server.dto.log.AccessLogReportDTO;
-import com.bytelab.tkline.server.entity.SysUser;
+import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.entity.UserAccessLog;
-import com.bytelab.tkline.server.mapper.UserMapper;
+import com.bytelab.tkline.server.mapper.SubscriptionMapper;
 import com.bytelab.tkline.server.mapper.UserAccessLogMapper;
 import com.bytelab.tkline.server.service.UserAccessLogService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public class UserAccessLogServiceImpl extends ServiceImpl<UserAccessLogMapper, UserAccessLog>
         implements UserAccessLogService {
 
-    private final UserMapper userMapper;
+    private final SubscriptionMapper subscriptionMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -42,10 +42,10 @@ public class UserAccessLogServiceImpl extends ServiceImpl<UserAccessLogMapper, U
                 .distinct()
                 .collect(Collectors.toList());
 
-        Map<String, Long> userMap = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                .in(SysUser::getUsername, usernames))
+        Map<String, Long> userMap = subscriptionMapper.selectList(new LambdaQueryWrapper<Subscription>()
+                .in(Subscription::getGroupName, usernames))
                 .stream()
-                .collect(Collectors.toMap(SysUser::getUsername, SysUser::getId));
+                .collect(Collectors.toMap(Subscription::getGroupName, Subscription::getId));
 
         // 2. 转换实体
         List<UserAccessLog> entities = new ArrayList<>();
@@ -64,7 +64,33 @@ public class UserAccessLogServiceImpl extends ServiceImpl<UserAccessLogMapper, U
         // 3. 批量保存
         // MyBatis Plus 的 saveBatch 默认是 1000 条一次，这里可以直接调用
         this.saveBatch(entities);
-
         log.info("Saved {} access logs", entities.size());
+    }
+
+    @Override
+    public com.baomidou.mybatisplus.core.metadata.IPage<UserAccessLog> pageQuery(
+            com.bytelab.tkline.server.dto.log.UserAccessLogQueryDTO queryDTO) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<UserAccessLog> page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
+                queryDTO.getPageNum(), queryDTO.getPageSize());
+
+        LambdaQueryWrapper<UserAccessLog> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(queryDTO.getNodeId() != null, UserAccessLog::getNodeId, queryDTO.getNodeId());
+
+        if (queryDTO.getUserId() != null) {
+            Subscription subscription = subscriptionMapper.selectById(queryDTO.getUserId());
+            if (subscription != null) {
+                wrapper.eq(UserAccessLog::getUsername, subscription.getGroupName());
+            } else {
+                wrapper.eq(UserAccessLog::getUserId, queryDTO.getUserId());
+            }
+        }
+
+        wrapper.like(org.springframework.util.StringUtils.hasText(queryDTO.getTargetAddress()),
+                UserAccessLog::getTargetAddress, queryDTO.getTargetAddress());
+        wrapper.ge(queryDTO.getStartTime() != null, UserAccessLog::getAccessTime, queryDTO.getStartTime());
+        wrapper.le(queryDTO.getEndTime() != null, UserAccessLog::getAccessTime, queryDTO.getEndTime());
+        wrapper.orderByDesc(UserAccessLog::getHitCount);
+
+        return this.page(page, wrapper);
     }
 }
