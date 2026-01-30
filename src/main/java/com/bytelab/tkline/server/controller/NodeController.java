@@ -97,7 +97,26 @@ public class NodeController {
      */
     @GetMapping("/downloadDockerComposeConfig/{id}")
     @Operation(summary = "下载节点 Docker Compose 配置文件")
-    public void downloadNodeDockerComposeConfig(@PathVariable Long id, HttpServletRequest request, HttpServletResponse response) {
+    public void downloadNodeDockerComposeConfig(@PathVariable Long id, HttpServletRequest request,
+            HttpServletResponse response) {
         nodeService.downloadNodeDockerComposeConfig(id, request, response);
+    }
+
+    /**
+     * 下载节点 Logrotate 配置文件
+     */
+    @GetMapping("/downloadLogrotateConfig/{id}")
+    @Operation(summary = "下载节点 Logrotate 配置文件")
+    public void downloadNodeLogrotateConfig(@PathVariable Long id, HttpServletResponse response) {
+        nodeService.downloadNodeLogrotateConfig(id, response);
+    }
+
+    /**
+     * 下载节点所有配置文件 (ZIP)
+     */
+    @GetMapping("/downloadAllConfig/{id}")
+    @Operation(summary = "下载节点所有配置文件 (ZIP)")
+    public void downloadAllNodeConfig(@PathVariable Long id, HttpServletRequest request, HttpServletResponse response) {
+        nodeService.downloadAllNodeConfig(id, request, response);
     }
 }

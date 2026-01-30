@@ -13,12 +13,14 @@ import com.bytelab.tkline.server.dto.node.NodeDTO;
 import com.bytelab.tkline.server.dto.relation.NodeSubscriptionBindDTO;
 import com.bytelab.tkline.server.entity.Node;
 import com.bytelab.tkline.server.entity.NodeSubscriptionRelation;
+import com.bytelab.tkline.server.entity.RuleProvider;
 import com.bytelab.tkline.server.entity.Subscription;
 import com.bytelab.tkline.server.exception.BusinessException;
 import com.bytelab.tkline.server.mapper.NodeMapper;
 import com.bytelab.tkline.server.mapper.NodeSubscriptionRelationMapper;
 import com.bytelab.tkline.server.mapper.SubscriptionMapper;
 import com.bytelab.tkline.server.service.NodeSubscriptionRelationService;
+import com.bytelab.tkline.server.service.RuleProviderService;
 import com.bytelab.tkline.server.service.SubscriptionService;
 import com.bytelab.tkline.server.util.SubscriptionOrderGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +48,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
     private final NodeSubscriptionRelationMapper nodeSubscriptionRelationMapper;
     private final NodeMapper nodeMapper;
     private final RealityConfig realityConfig;
+    private final RuleProviderService ruleProviderService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -65,9 +68,14 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
             subscription.setOrderNo(SubscriptionOrderGenerator.generateOrderNo());
         }
 
+        // 如果没有提供isPaid，默认设置为0(未付费)
+        if (subscription.getIsPaid() == null) {
+            subscription.setIsPaid(0);
+        }
+
         this.save(subscription);
-        log.info("Subscription created: id={}, groupName={}, orderNo={}",
-                subscription.getId(), subscription.getGroupName(), subscription.getOrderNo());
+        log.info("Subscription created: id={}, groupName={}, orderNo={}, isPaid={}",
+                subscription.getId(), subscription.getGroupName(), subscription.getOrderNo(), subscription.getIsPaid());
 
         return subscription.getId();
     }
@@ -624,6 +632,38 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
         }
         String proxyNamesStr = String.join("\n", proxyNames);
 
+        // 从数据库加载启用的 rule-providers
+        List<RuleProvider> ruleProviders = ruleProviderService.getEnabledRuleProviders();
+        StringBuilder ruleProvidersBuilder = new StringBuilder();
+        StringBuilder rulesBuilder = new StringBuilder();
+
+        // 生成 rule-providers 配置 和 rules 规则
+        for (RuleProvider rp : ruleProviders) {
+            // rule-providers 部分
+            ruleProvidersBuilder.append("  ").append(rp.getName()).append(":\n");
+            ruleProvidersBuilder.append("    type: ").append(rp.getType()).append("\n");
+            ruleProvidersBuilder.append("    behavior: ").append(rp.getBehavior()).append("\n");
+            ruleProvidersBuilder.append("    format: ").append(rp.getFormat()).append("\n");
+            ruleProvidersBuilder.append("    url: \"").append(rp.getUrl()).append("\"\n");
+            ruleProvidersBuilder.append("    path: ").append(rp.getPath()).append("\n");
+            ruleProvidersBuilder.append("    interval: ").append(rp.getUpdateInterval()).append("\n");
+
+            // rules 部分 - 根据 policy 生成对应的规则
+            String comment = rp.getDescription() != null ? "  # " + rp.getDescription() : "";
+            rulesBuilder.append("  - RULE-SET,").append(rp.getName()).append(",")
+                       .append(rp.getPolicy()).append(comment).append("\n");
+        }
+
+        String ruleProvidersStr = ruleProvidersBuilder.toString();
+        if (ruleProvidersStr.endsWith("\n")) {
+            ruleProvidersStr = ruleProvidersStr.substring(0, ruleProvidersStr.length() - 1);
+        }
+
+        String rulesStr = rulesBuilder.toString();
+        if (rulesStr.endsWith("\n")) {
+            rulesStr = rulesStr.substring(0, rulesStr.length() - 1);
+        }
+
         String config = """
                 # Clash Meta 配置文件模板
                 # 订阅组: """ + subscription.getGroupName() + "\n" + """
@@ -640,97 +680,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                       - DIRECT
 
                 rule-providers:
-                  geosite-tiktok:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tiktok.mrs"
-                    path: ./ruleset/geosite-tiktok.mrs
-                    interval: 86400
-                  geosite-youtube:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/youtube.mrs"
-                    path: ./ruleset/geosite-youtube.mrs
-                    interval: 86400
-                  geosite-google:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.mrs"
-                    path: ./ruleset/geosite-google.mrs
-                    interval: 86400
-                  geosite-instagram:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/instagram.mrs"
-                    path: ./ruleset/geosite-instagram.mrs
-                    interval: 86400
-                  geosite-facebook:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/facebook.mrs"
-                    path: ./ruleset/geosite-facebook.mrs
-                    interval: 86400
-                  geosite-twitter:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/twitter.mrs"
-                    path: ./ruleset/geosite-twitter.mrs
-                    interval: 86400
-                  geosite-netflix:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs"
-                    path: ./ruleset/geosite-netflix.mrs
-                    interval: 86400
-                  geosite-openai:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.mrs"
-                    path: ./ruleset/geosite-openai.mrs
-                    interval: 86400
-                  geosite-telegram:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.mrs"
-                    path: ./ruleset/geosite-telegram.mrs
-                    interval: 86400
-                  geosite-spotify:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.mrs"
-                    path: ./ruleset/geosite-spotify.mrs
-                    interval: 86400
-                  geosite-github:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.mrs"
-                    path: ./ruleset/geosite-github.mrs
-                    interval: 86400
-                  geosite-linkedin:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/linkedin.mrs"
-                    path: ./ruleset/geosite-linkedin.mrs
-                    interval: 86400
-                  geosite-category-ads-all:
-                    type: http
-                    behavior: domain
-                    format: mrs
-                    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs"
-                    path: ./ruleset/geosite-category-ads-all.mrs
-                    interval: 86400
+                """ + (ruleProvidersStr.isEmpty() ? "" : ruleProvidersStr + "\n") + """
 
                 rules:
                   # 局域网直连
@@ -740,21 +690,7 @@ public class SubscriptionServiceImpl extends ServiceImpl<SubscriptionMapper, Sub
                   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
                   - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
                   - IP-CIDR6,fe80::/10,DIRECT,no-resolve
-                  # 广告拦截
-                  - RULE-SET,geosite-category-ads-all,REJECT
-                  # 以下服务走代理
-                  - RULE-SET,geosite-tiktok,PROXY
-                  - RULE-SET,geosite-youtube,PROXY
-                  - RULE-SET,geosite-google,PROXY
-                  - RULE-SET,geosite-instagram,PROXY
-                  - RULE-SET,geosite-facebook,PROXY
-                  - RULE-SET,geosite-twitter,PROXY
-                  - RULE-SET,geosite-netflix,PROXY
-                  - RULE-SET,geosite-openai,PROXY
-                  - RULE-SET,geosite-telegram,PROXY
-                  - RULE-SET,geosite-spotify,PROXY
-                  - RULE-SET,geosite-github,PROXY
-                  - RULE-SET,geosite-linkedin,PROXY
+                """ + (rulesStr.isEmpty() ? "" : rulesStr + "\n") + """
                   # 中国大陆流量直连
                   - GEOIP,CN,DIRECT
                   - GEOSITE,CN,DIRECT

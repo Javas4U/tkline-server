@@ -37,6 +37,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -199,73 +201,21 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
                 throw new BusinessException("节点不存在: " + nodeId);
             }
 
-            // 2. 读取模板文件
-            ClassPathResource resource = new ClassPathResource("templates/server-config.json");
-            JsonNode configTemplate;
-            try (InputStream inputStream = resource.getInputStream()) {
-                configTemplate = objectMapper.readTree(inputStream);
-            }
+            // 2. 生成配置
+            String configContent = generateServerConfig(node);
 
-            // 3. 查询该节点关联的所有订阅用户
-            List<Subscription> subscriptions = nodeSubscriptionRelationMapper.selectSubscriptionsByNodeIdList(nodeId);
-
-            // 4. 根据节点协议类型填充用户配置
-            if (configTemplate instanceof ObjectNode) {
-                ObjectNode config = (ObjectNode) configTemplate;
-                JsonNode inbounds = config.get("inbounds");
-
-                if (inbounds != null && inbounds.isArray()) {
-                    for (JsonNode inbound : inbounds) {
-                        if (inbound instanceof ObjectNode) {
-                            ObjectNode inboundNode = (ObjectNode) inbound;
-                            String type = inboundNode.has("type") ? inboundNode.get("type").asText() : "";
-
-                            // 为每种协议类型填充用户列表
-                            ArrayNode users = objectMapper.createArrayNode();
-                            for (Subscription subscription : subscriptions) {
-                                ObjectNode user = createUserConfig(type, subscription);
-                                if (user != null) {
-                                    users.add(user);
-                                }
-                            }
-
-                            // 替换模板中的users字段
-                            if (users.size() > 0) {
-                                inboundNode.set("users", users);
-                            }
-
-                            // 如果是 VLESS 协议，替换 Reality 配置
-                            if ("vless".equalsIgnoreCase(type)) {
-                                JsonNode tls = inboundNode.get("tls");
-                                if (tls instanceof ObjectNode) {
-                                    ObjectNode tlsNode = (ObjectNode) tls;
-                                    JsonNode reality = tlsNode.get("reality");
-                                    if (reality instanceof ObjectNode) {
-                                        ObjectNode realityNode = (ObjectNode) reality;
-                                        // 使用配置中的 Reality 私钥
-                                        realityNode.put("private_key", realityConfig.getPrivateKey());
-                                        // 更新 short_id（如果需要的话）
-                                        ArrayNode shortIds = objectMapper.createArrayNode();
-                                        shortIds.add(realityConfig.getShortId());
-                                        realityNode.set("short_id", shortIds);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 5. 设置响应头
+            // 3. 设置响应头
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");
             String filename = node.getName() + "-server-config.json";
             response.setHeader("Content-Disposition",
-                "attachment; filename=\"" + new String(filename.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1) + "\"");
+                    "attachment; filename=\""
+                            + new String(filename.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1)
+                            + "\"");
 
-            // 6. 写入响应
+            // 4. 写入响应
             try (OutputStream outputStream = response.getOutputStream()) {
-                objectMapper.writerWithDefaultPrettyPrinter().writeValue(outputStream, configTemplate);
+                outputStream.write(configContent.getBytes(StandardCharsets.UTF_8));
             }
 
             log.info("Downloaded node config for node: {}, name: {}", nodeId, node.getName());
@@ -285,32 +235,20 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
                 throw new BusinessException("节点不存在: " + nodeId);
             }
 
-            // 2. 读取模板文件
-            ClassPathResource resource = new ClassPathResource("templates/docker-compose.yaml");
-            String template;
-            try (InputStream inputStream = resource.getInputStream()) {
-                template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-            }
-
-            // 3. 使用 HttpUtil 动态获取 baseUrl，支持反向代理
+            // 2. 生成配置
             String apiBaseUrl = HttpUtil.getBaseUrl(request);
-            log.debug("Docker Compose 配置 API baseUrl: {}", apiBaseUrl);
+            String dockerComposeContent = generateDockerComposeConfig(node, apiBaseUrl);
 
-            // 4. 替换模板中的占位符
-            String dockerComposeContent = template
-                .replace("{{NODE_NAME}}", node.getName())
-                .replace("{{DOMAIN}}", node.getDomain() != null ? node.getDomain() : node.getIpAddress())
-                .replace("${API_BASE_URL}", apiBaseUrl)
-                .replace("${API_KEY}", apiServiceSecret);
-
-            // 4. 设置响应头
+            // 3. 设置响应头
             response.setContentType("text/yaml");
             response.setCharacterEncoding("UTF-8");
             String filename = node.getName() + "-docker-compose.yaml";
             response.setHeader("Content-Disposition",
-                "attachment; filename=\"" + new String(filename.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1) + "\"");
+                    "attachment; filename=\""
+                            + new String(filename.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1)
+                            + "\"");
 
-            // 5. 写入响应
+            // 4. 写入响应
             try (OutputStream outputStream = response.getOutputStream()) {
                 outputStream.write(dockerComposeContent.getBytes(StandardCharsets.UTF_8));
             }
@@ -364,5 +302,175 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     private String generatePassword(String seed) {
         // 这里可以使用更复杂的密码生成逻辑
         return seed.substring(0, Math.min(32, seed.length()));
+    }
+
+    @Override
+    public void downloadNodeLogrotateConfig(Long nodeId, HttpServletResponse response) {
+        try {
+            // 1. 获取节点信息 (虽然配置是通用的，但还是校验一下节点是否存在)
+            Node node = this.getById(nodeId);
+            if (node == null) {
+                throw new BusinessException("节点不存在: " + nodeId);
+            }
+
+            // 2. 生成配置
+            String template = generateLogrotateConfig();
+
+            // 3. 设置响应头
+            response.setContentType("text/plain");
+            response.setCharacterEncoding("UTF-8");
+            String filename = "singbox-logrotate.conf";
+            response.setHeader("Content-Disposition",
+                    "attachment; filename=\""
+                            + new String(filename.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1)
+                            + "\"");
+
+            // 4. 写入响应
+            try (OutputStream outputStream = response.getOutputStream()) {
+                outputStream.write(template.getBytes(StandardCharsets.UTF_8));
+            }
+
+            log.info("Downloaded logrotate config for node: {}, name: {}", nodeId, node.getName());
+
+        } catch (IOException e) {
+            log.error("Failed to download logrotate config for node: {}", nodeId, e);
+            throw new BusinessException("下载 Logrotate 配置文件失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void downloadAllNodeConfig(Long nodeId, HttpServletRequest request, HttpServletResponse response) {
+        try {
+            // 1. 获取节点信息
+            Node node = this.getById(nodeId);
+            if (node == null) {
+                throw new BusinessException("节点不存在: " + nodeId);
+            }
+
+            // 2. 生成各配置文件内容
+            String serverConfig = generateServerConfig(node);
+            String apiBaseUrl = HttpUtil.getBaseUrl(request);
+            String dockerComposeConfig = generateDockerComposeConfig(node, apiBaseUrl);
+            String logrotateConfig = generateLogrotateConfig();
+
+            // 3. 设置响应头
+            response.setContentType("application/zip");
+            response.setCharacterEncoding("UTF-8");
+            String filename = node.getName() + "-all-configs.zip";
+            response.setHeader("Content-Disposition",
+                    "attachment; filename=\""
+                            + new String(filename.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1)
+                            + "\"");
+
+            // 4. 写入 ZIP
+            try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+                // server-config.json
+                ZipEntry serverEntry = new ZipEntry("config.json");
+                zos.putNextEntry(serverEntry);
+                zos.write(serverConfig.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                // docker-compose.yaml
+                ZipEntry dockerEntry = new ZipEntry("docker-compose.yaml");
+                zos.putNextEntry(dockerEntry);
+                zos.write(dockerComposeConfig.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                // singbox-logrotate.conf
+                ZipEntry logrotateEntry = new ZipEntry("singbox-logrotate.conf");
+                zos.putNextEntry(logrotateEntry);
+                zos.write(logrotateConfig.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.finish();
+            }
+
+            log.info("Downloaded all configs for node: {}, name: {}", nodeId, node.getName());
+
+        } catch (IOException e) {
+            log.error("Failed to download all configs for node: {}", nodeId, e);
+            throw new BusinessException("下载所有配置文件失败: " + e.getMessage());
+        }
+    }
+
+    private String generateServerConfig(Node node) throws IOException {
+        // 读取模板文件
+        ClassPathResource resource = new ClassPathResource("templates/server-config.json");
+        JsonNode configTemplate;
+        try (InputStream inputStream = resource.getInputStream()) {
+            configTemplate = objectMapper.readTree(inputStream);
+        }
+
+        // 查询该节点关联的所有订阅用户
+        List<Subscription> subscriptions = nodeSubscriptionRelationMapper.selectSubscriptionsByNodeIdList(node.getId());
+
+        // 根据节点协议类型填充用户配置
+        if (configTemplate instanceof ObjectNode) {
+            ObjectNode config = (ObjectNode) configTemplate;
+            JsonNode inbounds = config.get("inbounds");
+
+            if (inbounds != null && inbounds.isArray()) {
+                for (JsonNode inbound : inbounds) {
+                    if (inbound instanceof ObjectNode) {
+                        ObjectNode inboundNode = (ObjectNode) inbound;
+                        String type = inboundNode.has("type") ? inboundNode.get("type").asText() : "";
+
+                        // 为每种协议类型填充用户列表
+                        ArrayNode users = objectMapper.createArrayNode();
+                        for (Subscription subscription : subscriptions) {
+                            ObjectNode user = createUserConfig(type, subscription);
+                            if (user != null) {
+                                users.add(user);
+                            }
+                        }
+
+                        // 替换模板中的users字段
+                        if (users.size() > 0) {
+                            inboundNode.set("users", users);
+                        }
+
+                        // 如果是 VLESS 协议，替换 Reality 配置
+                        if ("vless".equalsIgnoreCase(type)) {
+                            JsonNode tls = inboundNode.get("tls");
+                            if (tls instanceof ObjectNode) {
+                                ObjectNode tlsNode = (ObjectNode) tls;
+                                JsonNode reality = tlsNode.get("reality");
+                                if (reality instanceof ObjectNode) {
+                                    ObjectNode realityNode = (ObjectNode) reality;
+                                    // 使用配置中的 Reality 私钥
+                                    realityNode.put("private_key", realityConfig.getPrivateKey());
+                                    // 更新 short_id（如果需要的话）
+                                    ArrayNode shortIds = objectMapper.createArrayNode();
+                                    shortIds.add(realityConfig.getShortId());
+                                    realityNode.set("short_id", shortIds);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(configTemplate);
+    }
+
+    private String generateDockerComposeConfig(Node node, String apiBaseUrl) throws IOException {
+        ClassPathResource resource = new ClassPathResource("templates/docker-compose.yaml");
+        String template;
+        try (InputStream inputStream = resource.getInputStream()) {
+            template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        return template
+                .replace("{{NODE_NAME}}", node.getName())
+                .replace("{{DOMAIN}}", node.getDomain() != null ? node.getDomain() : node.getIpAddress())
+                .replace("${API_BASE_URL}", apiBaseUrl)
+                .replace("${API_KEY}", apiServiceSecret);
+    }
+
+    private String generateLogrotateConfig() throws IOException {
+        ClassPathResource resource = new ClassPathResource("templates/singbox-logrotate.conf");
+        try (InputStream inputStream = resource.getInputStream()) {
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

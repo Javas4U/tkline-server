@@ -19,4 +19,7 @@ public class Subscription extends BaseEntity {
 
     @TableField("order_no")
     private String orderNo;
+
+    @TableField("is_paid")
+    private Integer isPaid;
 }

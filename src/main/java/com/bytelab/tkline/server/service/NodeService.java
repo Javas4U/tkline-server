@@ -76,4 +76,21 @@ public interface NodeService extends IService<Node> {
      * @param response HTTP响应
      */
     void downloadNodeDockerComposeConfig(Long nodeId, HttpServletRequest request, HttpServletResponse response);
+
+    /**
+     * 下载节点 Logrotate 配置文件
+     *
+     * @param nodeId   节点ID
+     * @param response HTTP响应
+     */
+    void downloadNodeLogrotateConfig(Long nodeId, HttpServletResponse response);
+
+    /**
+     * 下载节点所有配置文件 (ZIP)
+     *
+     * @param nodeId   节点ID
+     * @param request  HTTP请求
+     * @param response HTTP响应
+     */
+    void downloadAllNodeConfig(Long nodeId, HttpServletRequest request, HttpServletResponse response);
 }
