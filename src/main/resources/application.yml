@@ -88,8 +88,8 @@ springdoc:
     tags-sorter: alpha
     doc-expansion: none
   group-configs:
-    - group: 'default'
-      paths-to-match: '/**'
+    - group: "default"
+      paths-to-match: "/**"
       packages-to-scan: com.bytelab.tkline.server
 
 # Actuator 配置
@@ -117,25 +117,25 @@ logging:
 jwt:
   # JWT签名密钥（开发环境默认值，生产环境必须通过环境变量JWT_SECRET覆盖）
   secret: ${JWT_SECRET:25ce66ee090fc4e2d272289dc1a2e54d692cfbd35bbf96e60b2c308b3a0b2a15f7d7f38051ccff27038d5fc397dd09badc2c4ce52d089867c957cfbaa94c475e}
-  expiration: 1800  # Token过期时间（秒），默认30分钟
+  expiration: 1800 # Token过期时间（秒），默认30分钟
 
 # 安全配置
 security:
-  max-devices: 5    # 单用户最多同时登录设备数
-  max-login-attempts: 5  # 最大登录失败次数
-  lock-duration-minutes: 15  # 账号锁定时长（分钟）
+  max-devices: 5 # 单用户最多同时登录设备数
+  max-login-attempts: 5 # 最大登录失败次数
+  lock-duration-minutes: 15 # 账号锁定时长（分钟）
 
 # 缓存配置
 cache:
   # 用户信息缓存
   user:
-    max-size: 10000      # 最多缓存用户数
-    expire-hours: 24     # 24小时未访问自动清除
+    max-size: 10000 # 最多缓存用户数
+    expire-hours: 24 # 24小时未访问自动清除
   # Token缓存
   token:
-    max-size: 50000      # 最多缓存token数
-    cleanup-cron: "0 0 * * * ?"  # 每小时清理过期token
-    blacklist-cleanup-cron: "0 0 3 * * ?"  # 每天凌晨3点清理黑名单
+    max-size: 50000 # 最多缓存token数
+    cleanup-cron: "0 0 * * * ?" # 每小时清理过期token
+    blacklist-cleanup-cron: "0 0 3 * * ?" # 每天凌晨3点清理黑名单
 
 # Reality 协议配置
 reality:
@@ -151,6 +151,8 @@ reality:
 api:
   service:
     secret: ${API_SERVICE_SECRET:wjTMOWKEzXJFTQUG7MLMPt7pOQ3qRMXRZVQowrKxvHg=}
+    # API Key 认证允许的路径列表 (逗号分隔)
+    allowed-paths: /api/subscription/users,/api/log/report/access
 
 # 节点健康检查配置
 node:

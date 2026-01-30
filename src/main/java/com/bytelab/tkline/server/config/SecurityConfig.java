@@ -129,7 +129,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/node/heartbeat").permitAll()
 
                         // API Key 保护的接口(在 JwtAuthenticationFilter 中验证 API Key)
-                        .requestMatchers("/api/subscription/users").permitAll()
+                        .requestMatchers("/api/subscription/users", "/api/log/report/access").permitAll()
 
                         // Swagger文档(开发环境,生产环境建议禁用)
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()

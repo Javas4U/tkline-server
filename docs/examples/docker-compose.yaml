@@ -55,6 +55,8 @@ services:
       - RESTART_SINGBOX=${RESTART_SINGBOX:-true}
       - SINGBOX_CONTAINER_NAME=singbox
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # 节点标识，用于区分日志来源
+      - NODE_ID=${NODE_ID:-0}
     volumes:
       - /root/projects/sing-box/:/etc/sing-box/
       - /var/run/docker.sock:/var/run/docker.sock

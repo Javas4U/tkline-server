@@ -22,26 +22,27 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * JWT 和 API Key 统一认证过滤器（Spring Security集成版）
  * <p>
  * 功能：
  * 1. 支持两种认证方式：
- *    - JWT Token 认证：用于用户登录后的API访问
- *    - API Key 认证：用于外部服务（如 singbox-config-updater）访问特定接口
+ * - JWT Token 认证：用于用户登录后的API访问
+ * - API Key 认证：用于外部服务（如 singbox-config-updater）访问特定接口
  * 2. JWT 认证流程：
- *    - 从HTTP Header中提取JWT Token
- *    - 验证Token有效性（使用JwtUtil）
- *    - 从Token提取用户信息（userId和username）
- *    - 从缓存获取完整用户信息（UserInfoDTO，包含role等）
- *    - 创建Spring Security的Authentication对象（Principal存储完整UserInfoDTO）
- *    - 设置到SecurityContext（供@PreAuthorize和业务代码使用）
+ * - 从HTTP Header中提取JWT Token
+ * - 验证Token有效性（使用JwtUtil）
+ * - 从Token提取用户信息（userId和username）
+ * - 从缓存获取完整用户信息（UserInfoDTO，包含role等）
+ * - 创建Spring Security的Authentication对象（Principal存储完整UserInfoDTO）
+ * - 设置到SecurityContext（供@PreAuthorize和业务代码使用）
  * 3. API Key 认证流程：
- *    - 检查请求路径是否需要API Key认证
- *    - 从Authorization头提取Bearer Token
- *    - 验证API Key是否匹配配置的密钥
- *    - 认证失败返回401错误
+ * - 检查请求路径是否需要API Key认证
+ * - 从Authorization头提取Bearer Token
+ * - 验证API Key是否匹配配置的密钥
+ * - 认证失败返回401错误
  * 4. 自动续期：如果Token即将过期（剩余时间<总时长1/6），自动刷新并返回新Token
  * <p>
  * 架构设计：
@@ -87,16 +88,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * 7. 检查Token是否即将过期，自动续期
      * 8. 继续过滤器链
      *
-     * @param request HTTP请求
-     * @param response HTTP响应
+     * @param request     HTTP请求
+     * @param response    HTTP响应
      * @param filterChain 过滤器链
      * @throws ServletException Servlet异常
-     * @throws IOException IO异常
+     * @throws IOException      IO异常
      */
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
-                                     @NonNull HttpServletResponse response,
-                                     @NonNull FilterChain filterChain)
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         String requestUri = request.getRequestURI();
@@ -123,7 +124,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = jwtUtil.getUsernameFromToken(token);
 
                 log.debug("JWT Token验证通过，userId: {}, username: {}, URI: {}",
-                         userId, username, requestUri);
+                        userId, username, requestUri);
 
                 // 从缓存获取完整用户信息（包含role等）
                 UserInfoDTO userInfo = userCacheService.getUserInfo(userId);
@@ -135,17 +136,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // 注意：Spring Security的hasRole()方法会自动添加ROLE_前缀，所以这里需要添加前缀
                     String roleWithPrefix = "ROLE_" + userInfo.getRole();
                     Authentication authentication = new UsernamePasswordAuthenticationToken(
-                        userInfo,                                                    // Principal（完整的 UserInfoDTO 对象）
-                        null,                                                        // Credentials（密码，JWT认证不需要）
-                        Collections.singletonList(                                   // Authorities（权限列表）
-                            new SimpleGrantedAuthority(roleWithPrefix)               // 使用ROLE_前缀的角色作为Authority
-                        )
-                    );
+                            userInfo, // Principal（完整的 UserInfoDTO 对象）
+                            null, // Credentials（密码，JWT认证不需要）
+                            Collections.singletonList( // Authorities（权限列表）
+                                    new SimpleGrantedAuthority(roleWithPrefix) // 使用ROLE_前缀的角色作为Authority
+                            ));
 
                     // 设置到Spring Security的SecurityContext
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     log.debug("设置SecurityContext，userId: {}, username: {}, role: {}, authority: {}",
-                             userInfo.getId(), username, userInfo.getRole(), roleWithPrefix);
+                            userInfo.getId(), username, userInfo.getRole(), roleWithPrefix);
 
                     // 检查Token是否即将过期，如果是则自动刷新
                     if (jwtUtil.isTokenExpiringSoon(token)) {
@@ -214,23 +214,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * @param requestUri 请求 URI
      * @return 是否需要 API Key 认证
      */
+    @Value("#{'${api.service.allowed-paths}'.split(',')}")
+    private List<String> apiKeyProtectedPaths;
+
+    /**
+     * 判断是否是需要 API Key 保护的路径
+     *
+     * @param requestUri 请求 URI
+     * @return 是否需要 API Key 认证
+     */
     private boolean isApiKeyProtectedPath(String requestUri) {
-        // 需要 API Key 认证的路径列表
-        return requestUri.equals("/api/subscription/users");
+        // 打印调试日志
+        log.info("Checking API Key path: {}, allowed: {}", requestUri, apiKeyProtectedPaths);
+
+        // 检查路径是否在配置的白名单中
+        return apiKeyProtectedPaths != null && apiKeyProtectedPaths.contains(requestUri);
     }
 
     /**
      * API Key 认证
      *
-     * @param request HTTP请求
-     * @param response HTTP响应
+     * @param request    HTTP请求
+     * @param response   HTTP响应
      * @param requestUri 请求URI
      * @return 认证是否成功
      * @throws IOException IO异常
      */
     private boolean authenticateApiKey(HttpServletRequest request,
-                                       HttpServletResponse response,
-                                       String requestUri) throws IOException {
+            HttpServletResponse response,
+            String requestUri) throws IOException {
         log.debug("拦截需要 API Key 认证的请求: {}", requestUri);
 
         // 从请求头获取 Authorization
@@ -260,7 +272,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * 发送 401 未授权响应
      *
      * @param response HTTP响应
-     * @param message 错误消息
+     * @param message  错误消息
      * @throws IOException IO异常
      */
     private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
@@ -269,4 +281,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.getWriter().write(String.format("{\"code\":401,\"message\":\"%s\"}", message));
     }
 }
-
