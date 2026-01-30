@@ -27,8 +27,27 @@ services:
     volumes:
       - /root/projects/sing-box/config.json:/etc/sing-box/config.json
       - /root/projects/sing-box:/var/lib/sing-box
+      - /root/projects/sing-box/logs:/var/log/sing-box
       - /etc/letsencrypt/live/{{DOMAIN}}:/etc/sing-box/cert:ro
     command: run -c /etc/sing-box/config.json
+
+  # 2. 日志切割“保姆” (Sidecar)
+  log-rotator:
+    image: alpine:latest
+    container_name: sing-box-rotator
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+    depends_on:
+      - singbox
+    volumes:
+      - /root/projects/sing-box/logs:/var/log/sing-box
+      - /root/projects/sing-box/singbox-logrotate.conf:/etc/logrotate.d/sing-box
+    command: >
+      /bin/sh -c "apk add --no-cache logrotate && 
+      chmod 644 /etc/logrotate.d/sing-box &&
+      echo '0 * * * * /usr/sbin/logrotate /etc/logrotate.d/sing-box --verbose' > /etc/crontabs/root &&
+      crond -f -d 8"
 
   config-updater:
     image: registry.cn-shanghai.aliyuncs.com/bytelab/singbox-config-updater:0.2.0-corporate
@@ -45,6 +64,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - /root/projects/sing-box/:/etc/sing-box/
+      - /root/projects/sing-box/logs:/var/log/sing-box:ro
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - singbox

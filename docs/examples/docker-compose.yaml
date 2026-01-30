@@ -9,8 +9,38 @@ services:
     volumes:
       - /root/projects/sing-box/config.json:/etc/sing-box/config.json
       - /root/projects/sing-box:/var/lib/sing-box
+      # 【关键】将宿主机的 ./logs 映射进去
+      - /root/projects/sing-box/logs:/var/log/sing-box
       - /etc/letsencrypt/live/{{DOMAIN}}:/etc/sing-box/cert:ro
     command: run -c /etc/sing-box/config.json
+
+  # 2. 日志切割“保姆” (Sidecar)
+  log-rotator:
+    image: alpine:latest
+    container_name: singbox-rotator
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+    depends_on:
+      - singbox
+    volumes:
+      # 【关键】映射同一个日志目录
+      - /root/projects/sing-box/logs:/var/log/sing-box
+      # 映射配置文件
+      - /root/projects/sing-box/singbox-logrotate.conf:/etc/logrotate.d/sing-box
+    # 启动命令：
+    # 1. 安装 logrotate
+    # 2. 设置权限
+    # 3. 创建 cron 任务 (每小时的第0分钟执行)
+    # 4. 启动 crond (前台运行)
+    command: >
+      /bin/sh -c "apk add --no-cache logrotate && 
+      chmod 644 /etc/logrotate.d/sing-box &&
+      echo '0 * * * * /usr/sbin/logrotate /etc/logrotate.d/sing-box --verbose' > /etc/crontabs/root &&
+      crond -f -d 8"
+
+  # 这里的 ./logs 目录将会出现在你当前运行目录下
+  # 第三方统计程序直接读取 ./logs/sing-box.log 即可
 
   config-updater:
     image: registry.cn-shanghai.aliyuncs.com/bytelab/singbox-config-updater:0.2.0-corporate
@@ -28,5 +58,7 @@ services:
     volumes:
       - /root/projects/sing-box/:/etc/sing-box/
       - /var/run/docker.sock:/var/run/docker.sock
+      # 映射日志目录以供读取统计
+      - /root/projects/sing-box/logs:/var/log/sing-box:ro
     depends_on:
       - singbox
